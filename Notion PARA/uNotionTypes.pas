@@ -18,17 +18,18 @@ type
   //generic page
   TNotionPage = class
   private
-    FName: string;
     FID: string;
+    FName: string;
+    FLastEdited: string;
     FReferencedList: TNotionPages;
   protected
     FReferenceID : string;
-    procedure SetName(aName: String); virtual;
-    procedure SetID(aID: String); virtual;
     function GetSignature: string; virtual;
   public
-    property Name: string read FName write SetName;
-    property ID: string read FID write SetID;
+    property Name: string read FName;
+    property ID: string read FID;
+    property LastEdited: string read FLastEdited;
+
     property Reffers: string read FReferenceID;
     property ReferencedBy: TNotionPages read FReferencedList;
 
@@ -37,27 +38,37 @@ type
     function ToJSON: TJSONObject; virtual;
   end;
 
-  // a list of Notion Pages, from a dataset
-  TNotionDataSet = class
-  private
-      //
+  // a list of Notion Pages
+  TNotionPagesCollection = class
   protected
     FName: string;
-    FDbId: string;
     FDrive: TNotionDrive;
     FPages : TNotionPages;
-    function LoadPages(const pageSize: Integer= 0): TNotionPages;
-    function GetNotionPage(JSONObj: TJSONObject): TNotionPage; virtual; abstract;
-    procedure SetDBID(id: String);
+
+    function LoadPages(pagesJSON: TJSONObject): boolean;
+    function GetNotionPage(obj: TJSONObject): TNotionPage; virtual;
   public
     constructor Create(aNotionDrive : TNotionDrive); virtual;
 
     property Name: String read FName;
-    property DbID: String read FDbId write SetDBID;
     property Pages: TNotionPages read FPages;
 
-    function FindById(id: string): TNotionPage;
     function ToString: string; override;
+  end;
+
+  // a list of Notion Pages, from a dataset
+  TNotionDataSet = class(TNotionPagesCollection)
+  private
+      //
+  protected
+    FDbId: string;
+
+    function GetPages(const pageSize: Integer= 0): TNotionPages;
+    procedure SetDBID(id: String);
+  public
+    property DbID: String read FDbId write SetDBID;
+
+    function FindById(id: string): TNotionPage;
     function ToJSON: TJSONObject; virtual;
   end;
 
@@ -72,15 +83,17 @@ type
     // any datasets
     FDataSets: TObjectDictionary<String, TNotionDataSet>;
   protected
-    function LoadDataSet(dsName: String): TNotionDataSet; virtual;
     procedure ConnectDataSets; virtual;
+    function LoadOneDataSet(dsName: String): TNotionDataSet; virtual;
+    procedure AddToIndex(aPage: TNotionPage);
   public
     constructor Create(publicName, secretKey: String);
     destructor Destroy; override;
 
-    procedure AddToIndex(aPage: TNotionPage);
     procedure LogMessage(const Msg: string);
+
     function LoadDataSets: Integer;
+    function Search(strSearch: String; const pageSize: Integer=0): TNotionPagesCollection;
 
     property Client: TNotionClient read FClient;
     property DataSets: TObjectDictionary<String, TNotionDataSet> read FDataSets;
@@ -99,8 +112,9 @@ uses
 
 constructor TNotionPage.Create(aJSON: TJSONObject);
 begin
-  FName := 'genericName';
+  FName := 'generic Name';
   FID := 'generic ID';
+  FLastEdited := 'generic Last edited';
   FReferenceID := '';
   FReferencedList := TNotionPages.Create;
 
@@ -112,25 +126,20 @@ begin
     locValue := aJSON.FindValue('properties.Name.title[0].plain_text');
     if (locValue <> nil) then
        FName := locValue.Value;
+
+    locValue := aJSON.FindValue('last_edited_time');
+    if (locValue <> nil) then
+       FLastEdited := locValue.Value;
+
   finally
 
   end;
 end;
 
-procedure TNotionPage.SetID(aID: String);
-begin
-  FID := aID;
-end;
-
-procedure TNotionPage.SetName(aName: String);
-begin
-  FName := aName;
-end;
-
 
 function TNotionPage.GetSignature: string;
 begin
-  Result := Format('%s, "name": %s, "id": %s}', [ClassName, FName, FID]);
+  Result := Format('%s, "name": %s, "id": %s, "edited": %s}', [ClassName, FName, FID, FLastEdited]);
   if FReferenceID <> '' then
     Result := Result + Format(', "reffers: %s}', [FReferenceID]);
 end;
@@ -145,6 +154,7 @@ begin
   Result.AddPair('entity', ClassName);
   Result.AddPair('name', Name);
   Result.AddPair('id', ID);
+  Result.AddPair('edited', LastEdited);
 
   if ReferencedBy.Count > 0 then
   begin
@@ -180,53 +190,79 @@ begin
 end;
 
 
-{ TNotionDataSet }
-
-constructor TNotionDataSet.Create(aNotionDrive : TNotionDrive);
+{ TNotionPagesCollection }
+constructor TNotionPagesCollection.Create(aNotionDrive : TNotionDrive);
 begin
   FDrive := aNotionDrive;
   FPages := TNotionPages.Create([]);
 end;
 
-function TNotionDataSet.LoadPages(const pageSize: Integer=0): TNotionPages;
+
+function TNotionPagesCollection.GetNotionPage(obj: TJSONObject): TNotionPage;
+begin
+  Result := TNotionPage.Create(obj);
+end;
+
+function TNotionPagesCollection.LoadPages(pagesJSON: TJSONObject): Boolean;
+var
+  pageLoc: TNotionPage;
+  pages: TJSONArray;
+begin
+  Result := False;
+
+  pages := TJSONArray(pagesJSON.GetValue('results'));
+  if (pages <> nil) then
+  begin
+    var enum: TJSONArray.TEnumerator := pages.GetEnumerator;
+    while enum.MoveNext do
+    begin
+      var JSONObj: TJSONObject := TJSONObject(enum.Current);
+      // generic type, overriden in descendats
+      pageLoc := GetNotionPage(JSONObj);
+      // add to local collection
+      FPages.Add(pageLoc.ID, pageLoc);
+    end;
+
+    Result := True;
+  end;
+end;
+
+function TNotionPagesCollection.ToString: string;
+var
+  sl: TStringList;
+begin
+  sl := TStringList.Create;
+
+  for var Key in Pages.Keys do
+     sl.Add(Pages[Key].ToString);
+
+  Result := sl.Text;
+end;
+
+{ TNotionDataSet }
+
+
+function TNotionDataSet.GetPages(const pageSize: Integer=0): TNotionPages;
 var
   resource: string;
   body: string;
   response: TJSONObject;
-  pages: TJSONArray;
-  pageLoc: TNotionPage;
 begin
    if (pageSize > 0) then
    begin
       body :=  '{"page_size": ' + pageSize.ToString + '}';
    end;
 
-    resource := Format('databases/%s/query', [DbId]);
-    response := FDrive.Client.DOPost(resource, body);
-    if (response <> nil) then begin
-      pages := TJSONArray(response.GetValue('results'));
-      if (pages <> nil) then
-      begin
-        var enum: TJSONArray.TEnumerator := pages.GetEnumerator;
-        while enum.MoveNext do
-        begin
-          var JSONObj: TJSONObject := TJSONObject(enum.Current);
-          pageLoc := GetNotionPage(JSONObj);
+  resource := Format('databases/%s/query', [DbId]);
+  response := FDrive.Client.DOPost(resource, body);
+  if (response <> nil) then begin
+    LoadPages(response);
+  end;
 
-          // add to index
-          FDrive.AddToIndex(pageLoc);
-
-          // add to local collection
-          FPages.Add(pageLoc.ID, pageLoc);
-        end;
-      end;
-    end;
-
-    Result := FPages;
+  Result := FPages;
 end;
 
 procedure TNotionDataSet.SetDBID(id: String);
-
 begin
   // temporarely give it a name
   FName := id;
@@ -272,19 +308,6 @@ begin
   Result := jsonMain;
 end;
 
-function TNotionDataSet.ToString: string;
-var
-  sl: TStringList;
-begin
-  sl := TStringList.Create;
-
-  for var Key in Pages.Keys do
-     sl.Add(Pages[Key].ToString);
-
-  Result := sl.Text;
-end;
-
-
 
 
 {$REGION TNotionDrive}
@@ -317,42 +340,46 @@ end;
 
 procedure TNotionDrive.AddToIndex(aPage: TNotionPage);
 begin
+  // TODO protect this code
   FIdxPages.Add(aPage.ID, aPage);
 end;
 
 
 //gets info about the specific dataset and instantiates the appropriate class
 // TODO : revisit this to sync the index
-function TNotionDrive.LoadDataSet(dsName: String): TNotionDataSet;
+function TNotionDrive.LoadOneDataSet(dsName: String): TNotionDataSet;
 begin
   LogMessage('---> loading ' + dsName);
 
   Result := nil;
 
-
   if (dsName ='areas / resources') then begin
     Result := TPARAresources.Create(self);
-    Result.LoadPages;
+    Result.GetPages;
   end;
 
   if (dsName ='projects') then begin
     Result := TPARAProjects.Create(self);
-    Result.LoadPages;
+    Result.GetPages;
   end;
 
   if (dsName ='tasks') then begin
     Result := TPARATasks.Create(self);
-    Result.LoadPages;
+    Result.GetPages;
   end;
 
   if (dsName ='notes') then begin
     Result := TPARANotes.Create(self);
-    Result.LoadPages(100);
+    Result.GetPages(10);
   end;
 
   if Assigned(Result) then
   begin
      FDataSets.Add(Result.DbID, Result);
+
+    // add pages to index
+    for var oneKey in Result.Pages.Keys do
+      AddToIndex(Result.Pages[oneKey]);
   end;
 end;
 
@@ -364,19 +391,19 @@ var
 begin
   Result := 0;
 
-  dsLoc := LoadDataSet('areas / resources');
+  dsLoc := LoadOneDataSet('areas / resources');
   if Assigned(dsLoc) then
     Result := Result + 1;
 
-  dsLoc := LoadDataSet('projects');
+  dsLoc := LoadOneDataSet('projects');
   if Assigned(dsLoc) then
     Result := Result + 1;
 
-  dsLoc := LoadDataSet('tasks');
+  dsLoc := LoadOneDataSet('tasks');
   if Assigned(dsLoc) then
     Result := Result + 1;
 
-  dsLoc := LoadDataSet('notes');
+  dsLoc := LoadOneDataSet('notes');
   if Assigned(dsLoc) then
     Result := Result + 1;
 
@@ -405,6 +432,22 @@ end;
 procedure TNotionDrive.LogMessage(const Msg: string);
 begin
   FClient.LogMessage(Msg);
+end;
+
+// performs a search and returns a collection of pages
+function TNotionDrive.Search(strSearch: String; const pageSize: Integer=0): TNotionPagesCollection;
+var
+  srcRes: TJSONObject;
+  pcLoc : TNotionPagesCollection;
+begin
+  Result := nil;
+  srcRes := Client.Search(strSearch, pageSize);
+  if srcRes <> nil then
+  begin
+     pcLoc := TNotionPagesCollection.Create(self);
+     if pcLoc.LoadPages(srcRes) then
+       Result := pcLoc;
+  end;
 end;
 
 {$ENDREGION}

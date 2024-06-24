@@ -20,8 +20,9 @@ type
     procedure OnHTTPProtocolErrorHook(Sender: TCustomRESTRequest);
   public
     constructor Create(strName, strConnector: string);
+    destructor Destroy; override;
     procedure LogMessage(const Msg: string);
-    function Search(strSearch: string; LimitTo: integer): TJSONObject;
+    function Search(strSearch: string; LimitTo: integer=0): TJSONObject;
     function DOPost(const Resource: string; Body: string): TJSONObject;
     function DOGet(const Resource: string; Body: string): TJSONObject;
   end;
@@ -48,7 +49,7 @@ begin
   FRESTRequest.Client := FRESTClient;
   FRESTRequest.Response := FRESTResponse;
 
-  LogMessage('===== Initiated with ' + strConnector);
+  LogMessage(Format('===== Initiated with %s...', [Copy(strConnector, 0, 10)]));
 end;
 
 procedure TNotionClient.OnAfterExecuteHook(Sender: TCustomRESTRequest);
@@ -121,6 +122,13 @@ end;
 
 
 // execute a GET call
+destructor TNotionClient.Destroy;
+begin
+ LogMessage('===== BYE =====');
+
+ inherited;
+end;
+
 function TNotionClient.DOGet(const Resource: string; Body: string): TJSONObject;
 var
   strParams: TStringList;
@@ -160,12 +168,18 @@ begin
 end;
 
 
-function TNotionClient.Search(strSearch: string; LimitTo: integer): TJSONObject;
+function TNotionClient.Search(strSearch: string; LimitTo: integer=0): TJSONObject;
 var
   srcString: string;
+  strSize: string;
 begin
   LogMessage('Searching for: ' + strSearch);
-  srcString := Format('{"query": "%s", "page_size": %d }', [strSearch, LimitTo]);
+
+  strSize := '';
+  if LimitTo >0 then
+    strSize := Format('"page_size": %d, ',[LimitTo]);
+
+  srcString := Format('{"query": "%s", ' + strSize + '"filter" : {"value": "page", "property": "object" } }', [strSearch]);
 
   Result := DOPost('search', srcString);
 end;

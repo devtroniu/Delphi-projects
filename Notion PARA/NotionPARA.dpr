@@ -10,28 +10,45 @@ uses
   uNotionTypes in 'uNotionTypes.pas',
   uGlobalConstants in 'uGlobalConstants.pas';
 
+
+var
+  ndsLoc: TNotionDataSet;
 begin
   try
-    if (ParamCount > 0) then begin
-      var drive := TNotionDrive.Create('PARA Playground', NOTION_SECRET);
+    var drive := TNotionDrive.Create('PARA Playground', NOTION_SECRET);
 
-      WriteLn('index size: ', drive.PagesIndex.Count);
-      Write('loading datasets: ');
-      WriteLn(drive.LoadDataSets);
-      WriteLn('index size: ', drive.PagesIndex.Count);
+    WriteLn('index size: ', drive.PagesIndex.Count);
+    Write('loading datasets: ');
+    WriteLn(drive.LoadDataSets);
 
-      for var dsLoc in drive.DataSets do
-      begin
-        WriteLn(Format('== %s  ==', [dsLoc.Value.Name]));
-        WriteLn(dsLoc.Value.ToString);
-      end;
+    (*
+    ndsLoc := drive.LoadOneDataSet('areas / resources');
+    WriteLn(ndsLoc.ToString);
 
-      WriteLn('done.');
-    end
-    else
-      WriteLn('run the app with the secret as parameter');
+    ndsLoc := drive.LoadOneDataSet('projects');
+    WriteLn(ndsLoc.ToString);
 
+    ndsLoc := drive.LoadOneDataSet('tasks');
+    WriteLn(ndsLoc.ToString);
+
+    ndsLoc := drive.LoadOneDataSet('notes');
+    WriteLn(ndsLoc.ToString);
+
+    WriteLn('index size: ', drive.PagesIndex.Count);
+
+    WriteLn(' == connecting datasets === ');
+    drive.ConnectDataSets;
+    *)
+
+    for var dsLoc in drive.DataSets do
+    begin
+      WriteLn(Format('== %s  ==', [dsLoc.Value.Name]));
+      WriteLn(dsLoc.Value.ToString);
+    end;
+
+    WriteLn('done.');
     Readln;
+    drive.Free;
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);

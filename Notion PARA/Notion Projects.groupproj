@@ -9,6 +9,9 @@
         <Projects Include="NotionTests.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="NotionSearch.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -35,14 +38,23 @@
     <Target Name="NotionTests:Make">
         <MSBuild Projects="NotionTests.dproj" Targets="Make"/>
     </Target>
+    <Target Name="NotionSearch">
+        <MSBuild Projects="NotionSearch.dproj"/>
+    </Target>
+    <Target Name="NotionSearch:Clean">
+        <MSBuild Projects="NotionSearch.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="NotionSearch:Make">
+        <MSBuild Projects="NotionSearch.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="NotionPARA;NotionTests"/>
+        <CallTarget Targets="NotionPARA;NotionTests;NotionSearch"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="NotionPARA:Clean;NotionTests:Clean"/>
+        <CallTarget Targets="NotionPARA:Clean;NotionTests:Clean;NotionSearch:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="NotionPARA:Make;NotionTests:Make"/>
+        <CallTarget Targets="NotionPARA:Make;NotionTests:Make;NotionSearch:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
