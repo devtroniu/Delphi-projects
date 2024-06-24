@@ -12,7 +12,6 @@ uses
 type
   TfrmMain = class(TForm)
     memSelected: TMemo;
-    Panel1: TPanel;
     lvResults: TListView;
     edtSearch: TEdit;
     procedure FormActivate(Sender: TObject);
@@ -32,7 +31,7 @@ var
 
 implementation
 uses
-   System.JSON, uGlobalConstants;
+   System.JSON, uGlobalConstants, System.Threading;
 
 {$R *.fmx}
 
@@ -40,19 +39,60 @@ procedure TfrmMain.DoSearch;
 var
   strSearch: String;
   srcResults: TNotionPagesCollection;
+  npLoc: TNotionPage;
+  lviLoc: TListViewItem;
 begin
   strSearch := edtSearch.Text.Trim;
 
   // search only if at least 4 chars
-  if (strSearch.length > 3) then
+  if (strSearch.length < 4 ) then
   begin
-    memSelected.Text := '';
-    srcResults := ncDrive.Search(strSearch, 0);
-    if (srcResults <> nil) then
-      memSelected.Text := srcResults.ToString;
+    lvResults.Visible := False;
   end
-  else
+  else begin
     memSelected.Text := '';
+
+    // run in a thread
+    TTask.Run(
+      procedure
+      begin
+        srcResults := ncDrive.Search(strSearch, 0);
+
+        if (srcResults = nil) and (srcResults.Pages.Count > 0) then
+        begin
+          // sync with UI
+          TThread.Synchronize(nil,
+            procedure
+            begin
+              lvResults.Visible := False;
+            end);
+        end
+        else
+        begin
+          // sync with UI
+          TThread.Synchronize(nil,
+            procedure
+            begin
+              lvResults.Visible := True;
+              lvResults.BringToFront;
+              lvResults.Items.Clear;
+            end);
+
+          for var key in srcResults.Pages.Keys do
+          begin
+            npLoc := srcResults.Pages[key];
+            // sync with UI
+            TThread.Synchronize(nil,
+              procedure
+              begin
+                lviLoc := lvResults.Items.Add;
+                lviLoc.Text := npLoc.Name;
+                lviLoc.Detail := Format('%s (%s)', [npLoc.LastEdited, npLoc.ID]);
+              end);
+          end;
+        end;
+      end);
+  end
 end;
 
 procedure TfrmMain.edtSearchKeyUp(Sender: TObject; var Key: Word;
