@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{34D6EAF0-AED3-4E95-96F1-D9884EA9CA65}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="NotionRtti.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="NotionTests.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="NotionRtti">
+        <MSBuild Projects="NotionRtti.dproj"/>
+    </Target>
+    <Target Name="NotionRtti:Clean">
+        <MSBuild Projects="NotionRtti.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="NotionRtti:Make">
+        <MSBuild Projects="NotionRtti.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="NotionTests">
+        <MSBuild Projects="NotionTests.dproj"/>
+    </Target>
+    <Target Name="NotionTests:Clean">
+        <MSBuild Projects="NotionTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="NotionTests:Make">
+        <MSBuild Projects="NotionTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="NotionRtti;NotionTests"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="NotionRtti:Clean;NotionTests:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="NotionRtti:Make;NotionTests:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
