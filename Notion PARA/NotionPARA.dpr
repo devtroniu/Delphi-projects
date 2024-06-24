@@ -1,4 +1,4 @@
-program NotionRtti;
+program NotionPARA;
 
 {$APPTYPE CONSOLE}
 {$R *.res}

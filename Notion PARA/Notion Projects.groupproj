@@ -3,7 +3,7 @@
         <ProjectGuid>{34D6EAF0-AED3-4E95-96F1-D9884EA9CA65}</ProjectGuid>
     </PropertyGroup>
     <ItemGroup>
-        <Projects Include="NotionRtti.dproj">
+        <Projects Include="NotionPARA.dproj">
             <Dependencies/>
         </Projects>
         <Projects Include="NotionTests.dproj">
@@ -17,14 +17,14 @@
             <Default.Personality/>
         </BorlandProject>
     </ProjectExtensions>
-    <Target Name="NotionRtti">
-        <MSBuild Projects="NotionRtti.dproj"/>
+    <Target Name="NotionPARA">
+        <MSBuild Projects="NotionPARA.dproj"/>
     </Target>
-    <Target Name="NotionRtti:Clean">
-        <MSBuild Projects="NotionRtti.dproj" Targets="Clean"/>
+    <Target Name="NotionPARA:Clean">
+        <MSBuild Projects="NotionPARA.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="NotionRtti:Make">
-        <MSBuild Projects="NotionRtti.dproj" Targets="Make"/>
+    <Target Name="NotionPARA:Make">
+        <MSBuild Projects="NotionPARA.dproj" Targets="Make"/>
     </Target>
     <Target Name="NotionTests">
         <MSBuild Projects="NotionTests.dproj"/>
@@ -36,13 +36,13 @@
         <MSBuild Projects="NotionTests.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="NotionRtti;NotionTests"/>
+        <CallTarget Targets="NotionPARA;NotionTests"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="NotionRtti:Clean;NotionTests:Clean"/>
+        <CallTarget Targets="NotionPARA:Clean;NotionTests:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="NotionRtti:Make;NotionTests:Make"/>
+        <CallTarget Targets="NotionPARA:Make;NotionTests:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
