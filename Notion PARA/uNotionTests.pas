@@ -5,7 +5,7 @@ interface
 uses
   DUnitX.TestFramework,
   System.JSON,
-  uNotionClient, uPARAProjects;
+  uNotionClient;
 
 type
   [TestFixture]
@@ -14,10 +14,12 @@ type
     [Test]
     procedure TestConnection;
     [Test]
-    procedure TestGetProjects;
+    procedure TestInitializeDataSets;
   end;
 
 implementation
+uses
+  uGlobalConstants, uNotionTypes;
 
 { TNotionTests }
 
@@ -25,37 +27,23 @@ procedure TNotionTests.TestConnection;
 var
   client: TNotionClient;
 begin
-  client := TNotionClient.Create('Notion PARA testing', 'secret_BwQpQPmXq4yweYPX6bV6rbhjwJ5mRUp9g57JdhmSkl0');
+  client := TNotionClient.Create('Notion PARA testing', NOTION_SECRET);
 
   var JSONres: TJSONObject := client.Search('Clifton', 1);
 
   Assert.IsNotNull(JSONres, 'connection and search failed');
 end;
 
-procedure TNotionTests.TestGetProjects;
+procedure TNotionTests.TestInitializeDataSets;
 var
-  client: TNotionClient;
+  drive: TNotionDrive;
 begin
-  client := TNotionClient.Create('Notion PARA testing', 'secret_BwQpQPmXq4yweYPX6bV6rbhjwJ5mRUp9g57JdhmSkl0');
-  var projects := TPARAProjects.Create(client);
-  var strLoc := projects.ToString;
+  drive := TNotionDrive.Create('Notion PARA testing', NOTION_SECRET);
 
-  Assert.IsNotEmpty(strLoc, 'no projects retrieved');
+
+  Assert.IsTrue(drive.DataSets.Count > 0, 'no projects retrieved');
 end;
 
-(*
-procedure TNotionTests.TestParamCount;
-begin
-  var secret: string;
-
-  secret := '';
-  if (ParamCount > 0) then begin
-      secret := ParamStr(1);
-  end;
-
-  Assert.IsNotEmpty(secret, 'no secret in command line');
-end;
-*)
 
 initialization
   TDUnitX.RegisterTestFixture(TNotionTests);

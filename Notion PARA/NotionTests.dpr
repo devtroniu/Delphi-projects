@@ -15,7 +15,9 @@ uses
   DUnitX.TestFramework,
   uNotionTests in 'uNotionTests.pas',
   uNotionClient in 'uNotionClient.pas',
-  uPARATypes in 'uPARATypes.pas';
+  uPARATypes in 'uPARATypes.pas',
+  uGlobalConstants in 'uGlobalConstants.pas',
+  uNotionTypes in 'uNotionTypes.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

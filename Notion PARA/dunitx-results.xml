@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<test-results name="\\Mac\iCloud\coding\Embarcadero\Delphi-projects\Notion PARA\Win32\Debug\NotionTests.exe" total="2" errors="0" failures="0" ignored="0" inconclusive="0" not-run="0" skipped="0" invalid="0" date="2024-06-25" time="2.008">
+  <culture-info current-culture="en" current-uiculture="en" />
+  <test-suite type="Assembly" name="NotionTests.exe" executed="true" result="Success" success="True" time="2.008" asserts="0">
+    <results>
+        <test-suite type="Namespace" name="uNotionTests" executed="true" result="Success" success="True" time="2.008" asserts="0" >
+          <results>
+              <test-suite type="Fixture" name="TNotionTests" executed="True" result="Success" success="True" time="2.008" >
+                <results>
+                  <test-case name="TestConnection" executed="True" result="Success" success="True" time="0.599" asserts="0" />
+                  <test-case name="TestInitializeDataSets" executed="True" result="Success" success="True" time="1.414" asserts="0" />
+                </results>
+              </test-suite>
+          </results>
+        </test-suite>
+    </results>
+  </test-suite>
+</test-results>
