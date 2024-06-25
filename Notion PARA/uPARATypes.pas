@@ -14,7 +14,7 @@ type
   private
     FOriginalDate: String;
   protected
-    function GetSignature: string; override;
+    function SignatureString: string; override;
   public
     constructor Create(aJSON: TJSONObject); override;
     property OriginalDate: String read FOriginalDate;
@@ -94,10 +94,12 @@ begin
   end;
 end;
 
-function TPARANote.GetSignature: string;
+function TPARANote.SignatureString: string;
 begin
-  Result := inherited GetSignature;
-  Result := Result + Format('"date":%s}', [OriginalDate]);
+  Result := inherited SignatureString;
+
+  // adds the Original Date
+  Result := Result + Format(', "original date":%s}', [OriginalDate]);
 end;
 
 
@@ -146,6 +148,7 @@ begin
   inherited Create(aNotionDrive);
 
   DbId :=  NOTION_DB_NOTES;
+  FPageSize := 15;
 end;
 
 function TPARANotes.GetNotionPage(JSONObj: TJSONObject): TNotionPage;
