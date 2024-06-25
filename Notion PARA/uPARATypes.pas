@@ -148,7 +148,7 @@ begin
   inherited Create(aNotionDrive);
 
   DbId :=  NOTION_DB_NOTES;
-  FPageSize := 15;
+  FPageSize := 200;
 end;
 
 function TPARANotes.GetNotionPage(JSONObj: TJSONObject): TNotionPage;

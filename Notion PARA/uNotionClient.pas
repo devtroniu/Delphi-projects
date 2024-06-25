@@ -26,6 +26,9 @@ type
   end;
 
 implementation
+uses
+  System.Threading;
+
 function TNotionClient.Clone(postFix: string): TNotionClient;
 begin
   Result := TNotionClient.Create(FPublicName + '_' + postFix.Replace('/', '+'), FNotionSecret);
@@ -36,13 +39,16 @@ begin
   FPublicName := strName;
   FLogFile := strName + '.log';
   FNotionSecret := strConnector;
+
   // initialize the REST components
   FRESTClient := TRESTClient.Create(nil);
   FRESTRequest := TRESTRequest.Create(nil);
   FRESTResponse := TRESTResponse.Create(nil);
+
   // attach handlers for logging
   FRESTRequest.OnHTTPProtocolError := OnHTTPProtocolErrorHook;
   FRESTRequest.OnAfterExecute := OnAfterExecuteHook;
+
   // Set up the client and request
   FRESTClient.BaseURL := 'https://api.notion.com/v1';
   FRESTRequest.Client := FRESTClient;
@@ -81,31 +87,34 @@ end;
 // execute a POST call
 function TNotionClient.DOPost(const Resource: string; Body: string): TJSONObject;
 var
-  strParams: TStringList;
+  slParams: TStringList;
   Param: TRESTRequestParameter;
 begin
   FRESTRequest.Resource := Resource;
   FRESTRequest.Method := rmPOST;
   FRESTClient.Params.Clear;
 
+  slParams := TStringList.Create;
+
   // add header params
   Param := FRESTClient.Params.AddHeader('Notion-Version', '2022-06-28');
   Param.Options := [poDoNotEncode];
+  slParams.Add('Notion-Version: 2022-06-28');
+
   Param := FRESTClient.Params.AddHeader('Authorization', 'Bearer ' + FNotionSecret);
   Param.Options := [poDoNotEncode];
+  slParams.Add('Authorization: ' + Copy(Param.Value, 0, 17));
 
   //add body
-  FRESTClient.Params.AddBody(Body, ctAPPLICATION_JSON);
+  if (Body <> '') then
+  begin
+    FRESTClient.Params.AddBody(Body, ctAPPLICATION_JSON);
+    slParams.Add('Body: ' + Body);
+  end;
+
   LogMessage('Base URL: ' + FRESTClient.BaseURL);
   LogMessage('Resource: ' + FRESTRequest.Resource);
-
-  // add params
-  strParams := TStringList.Create;
-  for Param in FRESTClient.Params do
-  begin
-     strParams.Add(Param.Name + ': ' + Param.Value);
-  end;
-  LogMessage('Params: ' + strParams.Text);
+  LogMessage('Params: ' + slParams.Text);
 
   //execute
   FRESTRequest.Execute;
@@ -126,28 +135,34 @@ end;
 
 function TNotionClient.DOGet(const Resource: string; Body: string): TJSONObject;
 var
-  strParams: TStringList;
+  slParams: TStringList;
   Param: TRESTRequestParameter;
 begin
   FRESTRequest.Resource := Resource;
   FRESTRequest.Method := rmGET;
   FRESTClient.Params.Clear;
+
+  slParams := TStringList.Create;
+
   // add header params
   Param := FRESTClient.Params.AddHeader('Notion-Version', '2022-06-28');
   Param.Options := [poDoNotEncode];
+  slParams.Add('Notion-Version: 2022-06-28');
+
   Param := FRESTClient.Params.AddHeader('Authorization', 'Bearer ' + FNotionSecret);
   Param.Options := [poDoNotEncode];
+  slParams.Add('Authorization: ' + Copy(Param.Value, 0, 17));
+
   //add body
   if (Body <> '') then
+  begin
     FRESTClient.Params.AddBody(Body, ctAPPLICATION_JSON);
+    slParams.Add('Body: ' + Body);
+  end;
   LogMessage('Base URL: ' + FRESTClient.BaseURL);
   LogMessage('Resource: ' + FRESTRequest.Resource);
-  strParams := TStringList.Create;
-  for Param in FRESTClient.Params do
-  begin
-     strParams.Add(Param.Name + ': ' + Param.Value);
-  end;
-  LogMessage('Params: ' + strParams.Text);
+  LogMessage('Params: ' + slParams.Text);
+
   FRESTRequest.Execute;
   if (FRESTResponse.StatusCode <> 200) then
     Result := nil

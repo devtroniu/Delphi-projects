@@ -16,11 +16,11 @@ type
   //generic page
   TNotionPage = class
   private
-    FID: string;
     FName: string;
     FLastEdited: string;
     FReferencedList: TNotionPages;
   protected
+    FID: string;
     FReferenceID : string;
     function SignatureString: string; virtual;
   public
@@ -62,16 +62,21 @@ type
     FDbId: string;
     FPageSize: Integer;
   public
-    function RetrievePages(const Threaded: Boolean = false): boolean;
+    function RetrievePages: boolean;
+    procedure Initialize;
+    function PageById(id: string): TNotionPage;
+    function ToJSON: TJSONObject; virtual;
 
     property PageSize: Integer read FPageSize write FPageSize;
     property DbID: String read FDbId write SetDBID;
-    function PageById(id: string): TNotionPage;
-    function ToJSON: TJSONObject; virtual;
+
   end;
 
   TNotionDrive = class
   private
+    // working threaded
+    FThreaded: Boolean;
+    // datasets we know how to handle
     FKnownDatasets: TArray<String>;
     // connector to Notion
     FClient: TNotionClient;
@@ -80,18 +85,24 @@ type
     FIdxPages: TNotionPages;
     // any datasets
     FDataSets: TObjectDictionary<String, TNotionDataSet>;
+
+    procedure InitializeDataSets;
+    procedure InitializeDataSetsThreaded;
+    procedure AddToIndex(ds: TNotionDataSet);
+    function LoadDataSetsThreaded: Integer;
+    function LoadDataSetsNotThreaded: Integer;
   protected
     procedure ConnectDataSets; virtual;
-    procedure InitializeDataSets;
-    procedure AddToIndex(ds: TNotionDataSet);
   public
-    constructor Create(publicName, secretKey: String);
+    constructor Create(publicName, secretKey: String; const IsThreaded: Boolean=False);
     destructor Destroy; override;
+
     procedure LogMessage(const Msg: string);
     function LoadDataSets: Integer;
-    function LoadDataSetsThreaded: Integer;
     function Search(strSearch: String; const pageSize: Integer=0): TNotionPagesCollection;
+
     property Client: TNotionClient read FClient;
+    property IsThreaded: Boolean read FThreaded;
     property DataSets: TObjectDictionary<String, TNotionDataSet> read FDataSets;
     property PagesIndex: TNotionPages read FIdxPages;
   end;
@@ -225,23 +236,50 @@ end;
 
 procedure TNotionDataSet.SetDBID(id: String);
 begin
-  FDrive.LogMessage('retrive dataset info');
   // temporarely give it a name
   FName := id;
   FDBID := id;
+
+  // if threaded, will call Initialize explicitly in a thread
+  if FDrive.IsThreaded then
+    Exit;
+
+  // initialize here if not threaded
+  Initialize;
+end;
+
+procedure TNotionDataSet.Initialize;
+var
+  locClient: TNotionClient;
+begin
+  if FDrive.IsThreaded then
+  begin
+    locClient := FDrive.Client.Clone(FName);
+    locClient.LogMessage('retrive dataset info - threaded');
+  end
+  else
+  begin
+    locClient := FDrive.Client;
+    locClient.LogMessage('retrive dataset info');
+  end;
+
   // get the real name from Notion
-  var jSon := FDrive.Client.DOGet(Format('databases/%s', [FDbId]), '');
+  var jSon := locClient.DOGet(Format('databases/%s', [FDbId]), '');
   if Assigned(jSon) then
   begin
     var locValue := jSon.FindValue('title[0].text.content');
     if (locValue <> nil) then
        FName := locValue.Value;
   end;
-  FDrive.LogMessage(FName + ' found.');
+
+  locClient.LogMessage(FName + ' found.');
 end;
 
+
 // makes a call to Notion to fetch a number of objects
-function TNotionDataSet.RetrievePages(const Threaded: Boolean = false): Boolean;
+// depending on the setting of FDrive, this can be called directly or
+// executed from a thread
+function TNotionDataSet.RetrievePages: Boolean;
 var
   resource: string;
   body: string;
@@ -252,25 +290,26 @@ begin
 
   if (FPageSize > 0) then
   begin
-    body :=  '{"page_size": ' + FPageSize.ToString + '}';
+    body := '{"page_size": ' + FPageSize.ToString + '}';
   end;
   resource := Format('databases/%s/query', [DbId]);
 
-  if Threaded then
-    locClient := FDrive.Client.Clone(FName)
+  if FDrive.IsThreaded then
+    // clone the NotionClient to allow individual sets of REST components + log files and avoid conflicts
+    locClient := FDrive.Client.Clone(DbID)
   else
     locClient := FDrive.Client;
 
+  // make the call
   response := locClient.DOPost(resource, body);
-
-  if Threaded then
-    locClient.Free;
 
   if (response <> nil) then begin
     Result := LoadPages(response);
   end;
-end;
 
+  if FDrive.IsThreaded then
+    locClient.Free;
+end;
 
 
 function TNotionDataSet.PageById(id: string): TNotionPage;
@@ -302,8 +341,10 @@ end;
 {$REGION TNotionDrive}
 { TNotionDrive }
 // the main object that manages a connection
-constructor TNotionDrive.Create(publicName, secretKey: String);
+constructor TNotionDrive.Create(publicName, secretKey: String; const IsThreaded: Boolean=False);
 begin
+  FThreaded := IsThreaded;
+
   FKnownDatasets := ['areas_resources', 'projects', 'tasks', 'notes'];
 
   // Notion Client
@@ -332,6 +373,12 @@ procedure TNotionDrive.InitializeDataSets;
 var
   dsLoc: TNotionDataSet;
 begin
+  if IsThreaded then begin
+    InitializeDataSetsThreaded;
+    Exit;
+  end;
+
+  // non threaded
   for var dsName in FKnownDatasets do
   begin
     dsLoc := nil;
@@ -354,6 +401,60 @@ begin
   end;
 end;
 
+// run each initialisation in its own thread
+procedure TNotionDrive.InitializeDataSetsThreaded;
+var
+  Threads: TObjectList<TNotionDatasetRetrieveInfoThread>;
+  CompleteEvents: TObjectList<TEvent>;
+  evLoc: TEvent;
+  thLoc: TNotionDatasetRetrieveInfoThread;
+  dsLoc: TNotionDataset;
+begin
+  Threads := TObjectList<TNotionDatasetRetrieveInfoThread>.Create(True);
+  CompleteEvents := TObjectList<TEvent>.Create(True);
+  try
+    // Create and start threads
+    for var dsName in FKnownDatasets do
+    begin
+      dsLoc := nil;
+
+      if (dsName ='areas_resources') then begin
+        dsLoc := TPARAresources.Create(self);
+      end;
+      if (dsName ='projects') then begin
+        dsLoc := TPARAProjects.Create(self);
+      end;
+      if (dsName ='tasks') then begin
+        dsLoc := TPARATasks.Create(self);
+      end;
+      if (dsName ='notes') then begin
+        dsLoc := TPARANotes.Create(self);
+      end;
+
+      if Assigned(dsLoc) then
+      begin
+        FDataSets.Add(dsLoc.DbID, dsLoc);
+        evLoc := TEvent.Create(nil, True, False, dsName);
+        CompleteEvents.Add(evLoc);
+
+        LogMessage('starting initialization thread for ' + dsLoc.Name);
+        thLoc := TNotionDatasetRetrieveInfoThread.Create(dsLoc, evLoc);
+        Threads.Add(thLoc);
+        thLoc.Start;
+      end;
+    end;
+
+    // Wait for all threads to complete
+    for evLoc in CompleteEvents do
+    begin
+      evLoc.WaitFor(INFINITE);
+    end;
+    LogMessage('All initialization threads have completed.');
+  finally
+      CompleteEvents.Free;
+  end;
+end;
+
 procedure TNotionDrive.AddToIndex(ds: TNotionDataSet);
 var
   page: TNotionPage;
@@ -369,6 +470,15 @@ end;
 
 // load all known datasets
 function TNotionDrive.LoadDataSets: Integer;
+begin
+  if FThreaded then
+    Result := LoadDataSetsThreaded
+  else
+    Result := LoadDataSetsNotThreaded;
+end;
+
+
+function TNotionDrive.LoadDataSetsNotThreaded: Integer;
 var
   dsRes: TNotionDataSet;
 begin
@@ -395,13 +505,13 @@ end;
 // use one thred per dataset to retrieve the pages
 function TNotionDrive.LoadDataSetsThreaded: Integer;
 var
-  Threads: TObjectList<TNotionRetrieveThread>;
+  Threads: TObjectList<TNotionDatasetRetrievePagesThread>;
   CompleteEvents: TObjectList<TEvent>;
   evLoc: TEvent;
-  thLoc: TNotionRetrieveThread;
+  thLoc: TNotionDatasetRetrievePagesThread;
   dsLoc: TNotionDataset;
 begin
-  Threads := TObjectList<TNotionRetrieveThread>.Create(True);
+  Threads := TObjectList<TNotionDatasetRetrievePagesThread>.Create(True);
   CompleteEvents := TObjectList<TEvent>.Create(True);
   try
     // Create and start threads
@@ -412,7 +522,7 @@ begin
 
       dsLoc := FDataSets[dsKey];
       LogMessage('starting thread for ' + dsLoc.Name);
-      thLoc := TNotionRetrieveThread.Create(dsLoc, evLoc);
+      thLoc := TNotionDatasetRetrievePagesThread.Create(dsLoc, evLoc);
       Threads.Add(thLoc);
       thLoc.Start;
     end;

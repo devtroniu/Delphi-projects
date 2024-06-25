@@ -7,7 +7,18 @@ uses
   uNotionTypes, uPARATypes;
 
 type
-  TNotionRetrieveThread = class(TThread)
+  TNotionDatasetRetrievePagesThread = class(TThread)
+    private
+      FCompleteEvent: TEvent;
+      FDS: TNotionDataset;
+    protected
+      procedure Execute; override;
+    public
+      constructor Create(ds: TNotionDataset; ACompleteEvent: TEvent);
+    end;
+
+
+  TNotionDatasetRetrieveInfoThread = class(TThread)
     private
       FCompleteEvent: TEvent;
       FDS: TNotionDataset;
@@ -19,9 +30,11 @@ type
 
 implementation
 
-{ TLoadThread }
 
-constructor TNotionRetrieveThread.Create(ds: TNotionDataset; ACompleteEvent: TEvent);
+{ TNotionDatasetRetrieveInfoThread }
+
+constructor TNotionDatasetRetrieveInfoThread.Create(ds: TNotionDataset;
+  ACompleteEvent: TEvent);
 begin
   inherited Create(True); // Create suspended
   FreeOnTerminate := True; // Free automatically when done
@@ -29,14 +42,36 @@ begin
   FCompleteEvent := ACompleteEvent;
 end;
 
-procedure TNotionRetrieveThread.Execute;
+procedure TNotionDatasetRetrieveInfoThread.Execute;
 begin
   try
-    FDS.RetrievePages(True);
+    FDS.Initialize;
   finally
     // Signal that the thread has completed its work
     FCompleteEvent.SetEvent;
   end;
 end;
+
+{ TNotionDatasetRetrievePagesThread }
+
+constructor TNotionDatasetRetrievePagesThread.Create(ds: TNotionDataset; ACompleteEvent: TEvent);
+begin
+  inherited Create(True); // Create suspended
+  FreeOnTerminate := True; // Free automatically when done
+  FDS := ds;
+  FCompleteEvent := ACompleteEvent;
+end;
+
+procedure TNotionDatasetRetrievePagesThread.Execute;
+begin
+  try
+    FDS.RetrievePages;
+  finally
+    // Signal that the thread has completed its work
+    FCompleteEvent.SetEvent;
+  end;
+end;
+
+
 
 end.
