@@ -2,17 +2,17 @@ unit uNotionTypes;
 interface
 
 uses
-  System.SysUtils, System.JSON, System.Generics.Collections, System.Classes,
-  REST.Json,
-  uNotionClient;
+  System.SysUtils, System.JSON, System.Generics.Collections, System.Classes,  System.TypInfo,
+  REST.Json, uNotionClient;
 
 
 type
-  // forward declarations
   TNotionPage = class;
   TNotionDrive = class;
+
   // a list of pages
   TNotionPages = class(TObjectDictionary<String, TNotionPage>);
+
   //generic page
   TNotionPage = class
   private
@@ -34,7 +34,6 @@ type
     function ToJSON: TJSONObject; virtual;
   end;
 
-
   // a list of Notion Pages
   TNotionPagesCollection = class
   protected
@@ -53,7 +52,6 @@ type
     function ToString: string; override;
   end;
 
-
   // a list of Notion Pages, from a dataset
   TNotionDataSet = class(TNotionPagesCollection)
   private
@@ -69,15 +67,14 @@ type
 
     property PageSize: Integer read FPageSize write FPageSize;
     property DbID: String read FDbId write SetDBID;
-
   end;
+
+  TNotionDataSetType = (dstAreasResources, dstProjects, dstTasks, dstNotes, dstSomethingNew);
 
   TNotionDrive = class
   private
     // working threaded
     FThreaded: Boolean;
-    // datasets we know how to handle
-    FKnownDatasets: TArray<String>;
     // connector to Notion
     FClient: TNotionClient;
     // is the owner of attached objects
@@ -106,6 +103,7 @@ type
     property DataSets: TObjectDictionary<String, TNotionDataSet> read FDataSets;
     property PagesIndex: TNotionPages read FIdxPages;
   end;
+
 
 
 implementation
@@ -338,14 +336,18 @@ begin
   Result := jsonMain;
 end;
 
+
+
+
+
+
+
 {$REGION TNotionDrive}
-{ TNotionDrive }
+
 // the main object that manages a connection
 constructor TNotionDrive.Create(publicName, secretKey: String; const IsThreaded: Boolean=False);
 begin
   FThreaded := IsThreaded;
-
-  FKnownDatasets := ['areas_resources', 'projects', 'tasks', 'notes'];
 
   // Notion Client
   FClient := TNotionClient.Create(publicName, secretKey);
@@ -366,9 +368,12 @@ begin
   FDataSets.Free;
   FIdxPages.Free;
   FClient.Free;
+
   inherited;
 end;
 
+// not threaded
+// initialize all datasets by calling the factory with all known datasets
 procedure TNotionDrive.InitializeDataSets;
 var
   dsLoc: TNotionDataSet;
@@ -379,22 +384,9 @@ begin
   end;
 
   // non threaded
-  for var dsName in FKnownDatasets do
+  for var dsType := Low(TNotionDataSetType) to High(TNotionDataSetType) do
   begin
-    dsLoc := nil;
-
-    if (dsName ='areas_resources') then begin
-      dsLoc := TPARAresources.Create(self);
-    end;
-    if (dsName ='projects') then begin
-      dsLoc := TPARAProjects.Create(self);
-    end;
-    if (dsName ='tasks') then begin
-      dsLoc := TPARATasks.Create(self);
-    end;
-    if (dsName ='notes') then begin
-      dsLoc := TPARANotes.Create(self);
-    end;
+    dsLoc := TPARADataSetFactory.CreateDataSet(dsType, self);
 
     if Assigned(dsLoc) then
       FDataSets.Add(dsLoc.DbID, dsLoc);
@@ -402,6 +394,7 @@ begin
 end;
 
 // run each initialisation in its own thread
+// initialize all datasets by calling the factory with all known datasets
 procedure TNotionDrive.InitializeDataSetsThreaded;
 var
   Threads: TObjectList<TNotionDatasetRetrieveInfoThread>;
@@ -409,27 +402,16 @@ var
   evLoc: TEvent;
   thLoc: TNotionDatasetRetrieveInfoThread;
   dsLoc: TNotionDataset;
+  dsName: String;
 begin
   Threads := TObjectList<TNotionDatasetRetrieveInfoThread>.Create(True);
   CompleteEvents := TObjectList<TEvent>.Create(True);
   try
     // Create and start threads
-    for var dsName in FKnownDatasets do
+    for var dsType := Low(TNotionDataSetType) to High(TNotionDataSetType) do
     begin
-      dsLoc := nil;
-
-      if (dsName ='areas_resources') then begin
-        dsLoc := TPARAresources.Create(self);
-      end;
-      if (dsName ='projects') then begin
-        dsLoc := TPARAProjects.Create(self);
-      end;
-      if (dsName ='tasks') then begin
-        dsLoc := TPARATasks.Create(self);
-      end;
-      if (dsName ='notes') then begin
-        dsLoc := TPARANotes.Create(self);
-      end;
+      dsName := GetEnumName(TypeInfo(TNotionDataSetType), Ord(dsType));
+      dsLoc := TPARADataSetFactory.CreateDataSet(dsType, self);
 
       if Assigned(dsLoc) then
       begin
@@ -437,7 +419,9 @@ begin
         evLoc := TEvent.Create(nil, True, False, dsName);
         CompleteEvents.Add(evLoc);
 
-        LogMessage('starting initialization thread for ' + dsLoc.Name);
+        LogMessage('starting initialization thread for ' + dsName);
+
+        // create the thread
         thLoc := TNotionDatasetRetrieveInfoThread.Create(dsLoc, evLoc);
         Threads.Add(thLoc);
         thLoc.Start;
@@ -451,7 +435,7 @@ begin
     end;
     LogMessage('All initialization threads have completed.');
   finally
-      CompleteEvents.Free;
+    CompleteEvents.Free;
   end;
 end;
 
@@ -595,4 +579,5 @@ begin
 end;
 
 {$ENDREGION}
+
 end.

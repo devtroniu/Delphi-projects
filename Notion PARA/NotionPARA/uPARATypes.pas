@@ -4,7 +4,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.Generics.Defaults, System.Generics.Collections,
-  System.JSON,
+  System.JSON, System.TypInfo,
   uNotionClient, uNotionTypes;
 
 type
@@ -68,10 +68,16 @@ type
   end;
 
 
+  // class factory
+  TPARADataSetFactory = class
+     class function CreateDataSet(dsType: TNotionDataSetType; aNotionDrive: TNotionDrive): TNotionDataSet;
+  end;
+
+
 implementation
+
 uses
   uGlobalConstants;
-
 
 { TPARANote }
 constructor TPARANote.Create(aJSON: TJSONObject);
@@ -199,6 +205,24 @@ end;
 function TPARAresources.GetNotionPage(JSONObj: TJSONObject): TNotionPage;
 begin
   Result := TPARAResource.Create(JSONObj);
+end;
+
+{ TPARADataSetFactory }
+
+class function TPARADataSetFactory.CreateDataSet(dsType: TNotionDataSetType; aNotionDrive: TNotionDrive): TNotionDataSet;
+begin
+  case dsType of
+    dstAreasResources : Result := TPARAresources.Create(aNotionDrive);
+    dstProjects: Result := TPARAProjects.Create(aNotionDrive);
+    dstNotes : Result := TPARANotes.Create(aNotionDrive);
+    dstTasks: Result := TPARATasks.Create(aNotionDrive);
+  else
+    // silent crash
+    var dsName := GetEnumName(TypeInfo(TNotionDataSetType), Ord(dsType));
+    aNotionDrive.LogMessage(' !!! failed to create dataset ' + dsName);
+
+    Result := nil;
+  end;
 end;
 
 end.

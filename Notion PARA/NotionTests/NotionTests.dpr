@@ -13,10 +13,11 @@ uses
   {$ENDIF }
   DUnitX.TestFramework,
   uNotionTests in 'uNotionTests.pas',
-  uNotionClient in 'uNotionClient.pas',
-  uPARATypes in 'uPARATypes.pas',
-  uGlobalConstants in 'uGlobalConstants.pas',
-  uNotionTypes in 'uNotionTypes.pas';
+  uGlobalConstants in '..\NotionPARA\uGlobalConstants.pas',
+  uNotionClient in '..\NotionPARA\uNotionClient.pas',
+  uNotionTypes in '..\NotionPARA\uNotionTypes.pas',
+  uPARATypes in '..\NotionPARA\uPARATypes.pas',
+  uThreadedGet in '..\NotionPARA\uThreadedGet.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

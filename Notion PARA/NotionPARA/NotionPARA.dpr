@@ -8,9 +8,8 @@ uses
   uNotionClient in 'uNotionClient.pas',
   uPARATypes in 'uPARATypes.pas',
   uNotionTypes in 'uNotionTypes.pas',
-  uGlobalConstants in 'uGlobalConstants.pas',
-  uThreadedGet in 'uThreadedGet.pas';
-
+  uThreadedGet in 'uThreadedGet.pas',
+  uGlobalConstants in 'uGlobalConstants.pas';
 
 var
   drive: TNotionDrive;

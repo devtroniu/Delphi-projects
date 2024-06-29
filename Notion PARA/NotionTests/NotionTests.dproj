@@ -129,10 +129,11 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="uNotionTests.pas"/>
-        <DCCReference Include="uNotionClient.pas"/>
-        <DCCReference Include="uPARATypes.pas"/>
-        <DCCReference Include="uGlobalConstants.pas"/>
-        <DCCReference Include="uNotionTypes.pas"/>
+        <DCCReference Include="..\NotionPARA\uGlobalConstants.pas"/>
+        <DCCReference Include="..\NotionPARA\uNotionClient.pas"/>
+        <DCCReference Include="..\NotionPARA\uNotionTypes.pas"/>
+        <DCCReference Include="..\NotionPARA\uPARATypes.pas"/>
+        <DCCReference Include="..\NotionPARA\uThreadedGet.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

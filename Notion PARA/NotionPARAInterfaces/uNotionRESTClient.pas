@@ -1,12 +1,14 @@
-unit uNotionClient;
+unit uNotionRESTClient;
+
 interface
 uses
-  System.SysUtils, System.Classes, System.JSON,
+  System.SysUtils, System.Classes, uNotionInterfaces, System.JSON,
   REST.Client, REST.Types, Data.Bind.Components, Data.Bind.ObjectScope;
+
 type
-  TNotionClient = class
+  TNotionRESTClient = class(TInterfacedObject, INotionRESTClient)
   private
-    FLogFile: string;
+    FManager: INotionManager;
     FPublicName: string;
     FNotionSecret: string;
     FRESTClient: TRESTClient;
@@ -16,28 +18,31 @@ type
     procedure OnAfterExecuteHook(Sender: TCustomRESTRequest);
     procedure OnHTTPProtocolErrorHook(Sender: TCustomRESTRequest);
   public
-    constructor Create(strName, strConnector: string);
+    constructor Create(nm: INotionManager; strName, strConnector: string);
     destructor Destroy; override;
-    procedure LogMessage(const Msg: string);
+
     function Search(strSearch: string; LimitTo: integer=0): TJSONObject;
     function DOPost(const Resource: string; Body: string): TJSONObject;
     function DOGet(const Resource: string; Body: string): TJSONObject;
-    function Clone(postFix: string): TNotionClient;
+    function Clone(postFix: string): INotionRESTClient;
   end;
 
 implementation
+
 uses
   System.Threading;
 
-function TNotionClient.Clone(postFix: string): TNotionClient;
+{ TNotionRESTClient }
+
+function TNotionRESTClient.Clone(postFix: string): INotionRESTClient;
 begin
-  Result := TNotionClient.Create(FPublicName + '_' + postFix.Replace('/', '+'), FNotionSecret);
+  Result := TNotionRESTClient.Create(FManager, FPublicName + '_' + postFix.Replace('/', '+'), FNotionSecret);
 end;
 
-constructor TNotionClient.Create(strName: string; strConnector: string);
+constructor TNotionRESTClient.Create(nm: INotionManager; strName, strConnector: string);
 begin
+  FManager := nm;
   FPublicName := strName;
-  FLogFile := strName + '.log';
   FNotionSecret := strConnector;
 
   // initialize the REST components
@@ -53,68 +58,67 @@ begin
   FRESTClient.BaseURL := 'https://api.notion.com/v1';
   FRESTRequest.Client := FRESTClient;
   FRESTRequest.Response := FRESTResponse;
-  LogMessage(Format('===== Initiated with %s...', [Copy(strConnector, 0, 10)]));
+  FManager.LogMessage(Format('===== REST Client %s created', [FPublicName]));
 end;
 
-procedure TNotionClient.OnAfterExecuteHook(Sender: TCustomRESTRequest);
+destructor TNotionRESTClient.Destroy;
 begin
-  LogMessage('Request Executed. Status: ' + FRESTResponse.StatusText);
-  //LogMessage('Code: ' + FRESTResponse.StatusCode.ToString);
-  //LogMessage('Response JSON: ' + FRESTResponse.JSONText);
+  FManager.LogMessage(Format('===== %s BYE =====', [FPublicName]));
+
+  inherited;
 end;
 
-procedure TNotionClient.OnHTTPProtocolErrorHook(Sender: TCustomRESTRequest);
-begin
-  LogMessage('HTTP Protocol Error: ' + FRESTRequest.Response.StatusText);
-end;
-
-procedure TNotionClient.LogMessage(const Msg: string);
+function TNotionRESTClient.DOGet(const Resource: string;
+  Body: string): TJSONObject;
 var
-  LogFile: TextFile;
+  Param: TRESTRequestParameter;
 begin
-  AssignFile(LogFile, FLogFile);
-  if FileExists(FLogFile) then
-    Append(LogFile)
-  else
-    Rewrite(LogFile);
-  try
-    WriteLn(LogFile, FormatDateTime('dd hh:mm:ss:zzz', Now) + ' - ' + Msg);
-  finally
-    CloseFile(LogFile);
+  FRESTRequest.Resource := Resource;
+  FRESTRequest.Method := rmGET;
+  FRESTClient.Params.Clear;
+
+  // add header params
+  Param := FRESTClient.Params.AddHeader('Notion-Version', '2022-06-28');
+  Param.Options := [poDoNotEncode];
+
+  Param := FRESTClient.Params.AddHeader('Authorization', 'Bearer ' + FNotionSecret);
+  Param.Options := [poDoNotEncode];
+
+  //add body
+  if (Body <> '') then
+    FRESTClient.Params.AddBody(Body, ctAPPLICATION_JSON);
+
+  FManager.LogMessage('TNotionRESTClient.DOGet: ' + FRESTRequest.Resource);
+
+  FRESTRequest.Execute;
+  if (FRESTResponse.StatusCode <> 200) then
+    Result := nil
+  else begin
+    Result := TJSONObject.ParseJSONValue(FRESTResponse.JSONText) as TJSONObject;
   end;
 end;
 
-// execute a POST call
-function TNotionClient.DOPost(const Resource: string; Body: string): TJSONObject;
+function TNotionRESTClient.DOPost(const Resource: string;
+  Body: string): TJSONObject;
 var
-  slParams: TStringList;
   Param: TRESTRequestParameter;
 begin
   FRESTRequest.Resource := Resource;
   FRESTRequest.Method := rmPOST;
   FRESTClient.Params.Clear;
 
-  slParams := TStringList.Create;
-
   // add header params
   Param := FRESTClient.Params.AddHeader('Notion-Version', '2022-06-28');
   Param.Options := [poDoNotEncode];
-  slParams.Add('Notion-Version: 2022-06-28');
 
   Param := FRESTClient.Params.AddHeader('Authorization', 'Bearer ' + FNotionSecret);
   Param.Options := [poDoNotEncode];
-  slParams.Add('Authorization: ' + Copy(Param.Value, 0, 17));
 
   //add body
   if (Body <> '') then
-  begin
     FRESTClient.Params.AddBody(Body, ctAPPLICATION_JSON);
-    slParams.Add('Body: ' + Body);
-  end;
 
-  LogMessage('Base URL: ' + FRESTClient.BaseURL);
-  LogMessage('Resource: ' + FRESTRequest.Resource);
-  LogMessage('Params: ' + slParams.Text);
+  FManager.LogMessage('TNotionRESTClient.DOPost ' + FRESTRequest.Resource);
 
   //execute
   FRESTRequest.Execute;
@@ -125,62 +129,30 @@ begin
   end;
 end;
 
-// execute a GET call
-destructor TNotionClient.Destroy;
+procedure TNotionRESTClient.OnAfterExecuteHook(Sender: TCustomRESTRequest);
 begin
- LogMessage('===== BYE =====');
-
- inherited;
+  FManager.LogMessage('Request Executed. Status: ' + FRESTResponse.StatusText);
+  //FManager.LogMessage('Code: ' + FRESTResponse.StatusCode.ToString);
+  //FManager.LogMessage('Response JSON: ' + FRESTResponse.JSONText);
 end;
 
-function TNotionClient.DOGet(const Resource: string; Body: string): TJSONObject;
-var
-  slParams: TStringList;
-  Param: TRESTRequestParameter;
+procedure TNotionRESTClient.OnHTTPProtocolErrorHook(Sender: TCustomRESTRequest);
 begin
-  FRESTRequest.Resource := Resource;
-  FRESTRequest.Method := rmGET;
-  FRESTClient.Params.Clear;
-
-  slParams := TStringList.Create;
-
-  // add header params
-  Param := FRESTClient.Params.AddHeader('Notion-Version', '2022-06-28');
-  Param.Options := [poDoNotEncode];
-  slParams.Add('Notion-Version: 2022-06-28');
-
-  Param := FRESTClient.Params.AddHeader('Authorization', 'Bearer ' + FNotionSecret);
-  Param.Options := [poDoNotEncode];
-  slParams.Add('Authorization: ' + Copy(Param.Value, 0, 17));
-
-  //add body
-  if (Body <> '') then
-  begin
-    FRESTClient.Params.AddBody(Body, ctAPPLICATION_JSON);
-    slParams.Add('Body: ' + Body);
-  end;
-  LogMessage('Base URL: ' + FRESTClient.BaseURL);
-  LogMessage('Resource: ' + FRESTRequest.Resource);
-  LogMessage('Params: ' + slParams.Text);
-
-  FRESTRequest.Execute;
-  if (FRESTResponse.StatusCode <> 200) then
-    Result := nil
-  else begin
-    Result := TJSONObject.ParseJSONValue(FRESTResponse.JSONText) as TJSONObject;
-  end;
+  FManager.LogMessage('HTTP Protocol Error: ' + FRESTRequest.Response.StatusText);
 end;
 
-function TNotionClient.Search(strSearch: string; LimitTo: integer=0): TJSONObject;
+function TNotionRESTClient.Search(strSearch: string;
+  LimitTo: integer): TJSONObject;
 var
   srcString: string;
   strSize: string;
 begin
-  LogMessage('Searching for: ' + strSearch);
+  FManager.LogMessage('Searching for: ' + strSearch);
   strSize := '';
-  if LimitTo >0 then
+  if LimitTo > 0 then
     strSize := Format('"page_size": %d, ',[LimitTo]);
   srcString := Format('{"query": "%s", ' + strSize + '"filter" : {"value": "page", "property": "object" } }', [strSearch]);
   Result := DOPost('search', srcString);
 end;
+
 end.
