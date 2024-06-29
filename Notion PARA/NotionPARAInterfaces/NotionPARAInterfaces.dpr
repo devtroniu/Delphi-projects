@@ -24,17 +24,19 @@ begin
   /// threaded
   try
     dtStart := Now;
-    Write('==================================================================== not threaded. initializing...');
-    drive := TNotionManager.Create('NotionPARAInterfaces', NOTION_SECRET, TPARADataSetFactory.Create, False);
+    Write('==================================================================== threaded. initializing...');
+    drive := TNotionManager.Create('NotionPARAInterfaces', NOTION_SECRET, TPARADataSetFactory.Create, True);
     WriteLn('initialization took ' + FormatDateTime('ss:zzz', dtStart - Now));
     Write('loading pages for datasets: ');
     WriteLn(drive.LoadDataSets);
 
     // write everything from index
+    (*
     for var pageKey in drive.PagesIndex.Keys do
     begin
       WriteLn(drive.PagesIndex[pageKey].ToString);
     end;
+    *)
 
     WriteLn('index size: ', drive.PagesIndex.Count);
     WriteLn('==== threaded done. ====');
