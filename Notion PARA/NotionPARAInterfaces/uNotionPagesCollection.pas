@@ -3,16 +3,20 @@ unit uNotionPagesCollection;
 interface
 
 uses
-  System.SysUtils, System.Classes, uNotionInterfaces, System.JSON, System.Generics.Collections;
+  System.SysUtils, System.Classes, uNotionInterfaces, System.JSON, System.Generics.Collections, System.TypInfo;
 
 
 type
+
   TNotionPagesCollection = class(TInterfacedObject, INotionPagesCollection)
   private
     FName: string;
     FManager: INotionManager;
     FPages : TObjectDictionary<String, INotionPage>;
     FDbId: string;
+    // =0: gets whatever is first: the max nr of results from Notion (100) or all available pages (response size < 100)
+    // >0: will get the specified number of pages. If > 100, multiple calls will be done
+    // -1: will get all available pages, in a succession of calls.
     FQuerySize: Integer;
     FDsType: TNotionDataSetType;
   public
@@ -37,7 +41,6 @@ type
     property QuerySize: Integer read GetQuerySize write SetQuerySize;
     property DbID: String read GetDBID write SetDBID;
   end;
-
 
 
   TNotionDataSet = class(TNotionPagesCollection)
@@ -112,7 +115,6 @@ begin
     end;
     Result := True;
   end;
-
 end;
 
 function TNotionPagesCollection.PageById(id: string): INotionPage;
@@ -127,6 +129,8 @@ begin
   // Notion agnostic at this level, leave implemetation to descendants
   Result := true;
 end;
+
+
 
 procedure TNotionPagesCollection.SetDBID(id: String);
 begin
@@ -177,37 +181,6 @@ begin
   FDsType := dsType;
 end;
 
-
-function TNotionDataSet.FetchPages: boolean;
-var
-  resource: string;
-  body: string;
-  response: TJSONObject;
-  locClient: INotionRESTClient;
-begin
-  Result := false;
-
-  if (FQuerySize > 0) then
-  begin
-    FManager.LogMessage(Format('page_size = %d', [FQuerySize]));
-    body := '{"page_size": ' + FQuerySize.ToString + '}';
-  end;
-  resource := Format('databases/%s/query', [DbId]);
-
-  if FManager.IsThreaded then
-    // clone the NotionClient to allow individual sets of REST components + log files and avoid conflicts
-    locClient := FManager.Client.Clone(DbID)
-  else
-    locClient := FManager.Client;
-
-  // make the call
-  response := locClient.DOPost(resource, body);
-
-  if (response <> nil) then begin
-    Result := LoadPages(response);
-  end;
-end;
-
 procedure TNotionDataSet.Initialize;
 var
   locClient: INotionRESTClient;
@@ -248,6 +221,82 @@ begin
 
   // initialize here if not threaded
   Initialize;
+end;
+
+
+function TNotionDataSet.FetchPages: boolean;
+var
+  resource: string;
+  body: string;
+  response: TJSONObject;
+  locClient: INotionRESTClient;
+  pageSize : Integer;
+  nextCursor: string;
+begin
+  nextCursor := '';
+
+  if FManager.IsThreaded then
+    // clone the NotionClient to allow individual sets of REST components + log files and avoid conflicts
+    locClient := FManager.Client.Clone(DbID)
+  else
+    locClient := FManager.Client;
+
+  repeat
+    Result := false;
+    body := '';
+
+    if (FQuerySize <> 0) then
+    begin
+      // calculate the page size
+      pageSize := 0;
+
+      // if a number was specified, try to get that.
+      // if specified is > 100, Notion will limit the response to 100, so we'll loop again
+      if (FQuerySize > 0) then
+        pageSize := FQuerySize - FPages.Count;
+
+      if FQuerySize < 0 then
+        pageSize := 100; // get max allowed by Notion, loop again
+
+      // build a body for the call
+      body := Format('{"page_size": %d', [pageSize]);
+      // if we want more than we have and we have a next cursor, add that in call
+      if (nextCursor <> '') then
+        body := body + Format(', "start_cursor": "%s"', [nextCursor]);
+      body := body + '}';
+
+      FManager.LogMessage(Format('fetching for %s, call body: %s', [FName, body]));
+    end;
+
+    resource := Format('databases/%s/query', [DbId]);
+
+    // make the call
+    response := locClient.DOPost(resource, body);
+
+    if (response <> nil) then begin
+      // load in memory returned pages
+      Result := LoadPages(response);
+
+      // do we have another set?
+      nextCursor := '';
+      var locHasMore: TJSONValue := response.FindValue('has_more');
+      if (locHasMore is TJSONBool) then
+      begin
+         if TJSONBool(locHasMore).AsBoolean then
+         begin
+           var locNextCursor: TJSONValue := response.FindValue('next_cursor');
+           if (locNextCursor <> nil) then
+             nextCursor := locNextCursor.Value;
+         end;
+      end;
+    end;
+
+  until (Result = False) or  // something went wrong
+        (FQuerySize = 0) or  // terminate if whatever number works
+        ((FQuerySize > 0) and (FPages.Count >= FQuerySize)) or // we got the requested number of pages
+        (nextCursor = ''); // terminate only if no more pages (FQuerySize < 0)
+
+  FManager.LogMessage(Format('fetching for %s ended with %d pages.', [FName, FPages.Count]));
 end;
 
 end.

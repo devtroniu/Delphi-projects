@@ -24,8 +24,8 @@ begin
   /// threaded
   try
     dtStart := Now;
-    Write('=========================================================================== threaded. initializing...');
-    drive := TNotionManager.Create('NotionPARAInterfaces', NOTION_SECRET, TPARADataSetFactory.Create, True);
+    Write('==================================================================== not threaded. initializing...');
+    drive := TNotionManager.Create('NotionPARAInterfaces', NOTION_SECRET, TPARADataSetFactory.Create, False);
     WriteLn('initialization took ' + FormatDateTime('ss:zzz', dtStart - Now));
     Write('loading pages for datasets: ');
     WriteLn(drive.LoadDataSets);
@@ -40,11 +40,13 @@ begin
     WriteLn('==== threaded done. ====');
     WriteLn('total time: ' + FormatDateTime('ss:zzz', dtStart - Now));
 
+    (*
     Writeln('Searching for light');
     dtStart := Now;
     var pages: TNotionPagesCollection := drive.Search('light', 10) as TNotionPagesCollection;
     WriteLn(pages.ToString);
     WriteLn('total time: ' + FormatDateTime('ss:zzz', dtStart - Now));
+    *)
 
     Write('press that key');
     Readln;

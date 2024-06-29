@@ -97,6 +97,7 @@ begin
   inherited;
 end;
 
+// creates the appropriate notion page by calling the factory
 function TNotionManager.CreateNotionPage(pageType: TNotionDataSetType;
   obj: TJSONObject): INotionPage;
 begin
@@ -120,7 +121,7 @@ var
   locPage: INotionPage;
   refPage: INotionPage;
 begin
-  LogMessage('Connecting pages');
+  //LogMessage('Connecting pages');
   for var Key in FIdxPages.Keys do begin
     locPage := FIdxPages[Key];
     if (locPage.Reffers <> '') and (FIdxPages.ContainsKey(locPage.Reffers)) then
@@ -130,7 +131,7 @@ begin
         refPage.BackReference.Add(locPage.ID, locPage);
     end;
   end;
-  LogMessage('Connecting done');
+  LogMessage('Connecting pages done');
 end;
 
 function TNotionManager.GetDataSets: TObjectDictionary<String, INotionPagesCollection>;
@@ -153,6 +154,9 @@ begin
   Result := FIdxPages;
 end;
 
+// known datasets are initialized and added in the list of datasets
+// no pages are fetched at this level, just info about the dataset
+// it can run threaded or not, depeding on the mode Manager is in
 procedure TNotionManager.InitializeDataSets;
 var
   dsLoc: INotionPagesCollection;
@@ -172,6 +176,8 @@ begin
   end;
 end;
 
+
+// threaded initialization
 procedure TNotionManager.InitializeDataSetsThreaded;
 var
   Threads: TObjectList<TNotionDatasetFetchInfoThread>;

@@ -141,7 +141,8 @@ constructor TPARANotes.Create(aNotionManager: INotionManager; dsType: TNotionDat
 begin
   inherited Create(aNotionmanager, dsType);
 
-  QuerySize := 20;
+  // fetch all notes
+  QuerySize := -1;
   DbId :=  NOTION_DB_NOTES;
 end;
 

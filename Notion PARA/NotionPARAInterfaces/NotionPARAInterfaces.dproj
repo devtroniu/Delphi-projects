@@ -132,7 +132,8 @@
         <DCCReference Include="uPARATypes.pas"/>
         <DCCReference Include="..\NotionPARA\uGlobalConstants.pas"/>
         <DCCReference Include="uLogger.pas"/>
-        <None Include="Win32\Debug\PARA Playground.log"/>
+        <None Include="README.md"/>
+        <None Include="Win32\Debug\NotionPARAInterfaces.log"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -170,13 +171,19 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
+                <DeployFile LocalName="README.md" Configuration="Debug" Class="ProjectFile">
+                    <Platform Name="Win32">
+                        <RemoteDir>.\</RemoteDir>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployFile LocalName="Win32\Debug\NotionPARAInterfaces.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>NotionPARAInterfaces.exe</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="Win32\Debug\PARA Playground.log" Configuration="Debug" Class="ProjectFile">
+                <DeployFile LocalName="Win32\Debug\NotionPARAInterfaces.log" Configuration="Debug" Class="ProjectFile">
                     <Platform Name="Win32">
                         <RemoteDir>.\</RemoteDir>
                         <Overwrite>true</Overwrite>
