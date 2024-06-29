@@ -21,8 +21,6 @@ NotionPARAInterfaces
 
 
 logged run:
-
-
 29 18:38:15:263 - ===== REST Client NotionPARAInterfaces created
 29 18:38:15:263 -  !!! failed to create dataset dstGeneric
 29 18:38:15:263 - starting initialization thread for dstAreasResources
