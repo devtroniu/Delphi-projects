@@ -14,6 +14,8 @@ type
     FRESTClient: TRESTClient;
     FRESTRequest: TRESTRequest;
     FRESTResponse: TRESTResponse;
+    procedure InitializeRequest(const Resource: string; const Method: TRESTRequestMethod; const Body: string);
+    function ExecuteRequest: TJSONObject;
   protected
     procedure OnAfterExecuteHook(Sender: TCustomRESTRequest);
     procedure OnHTTPProtocolErrorHook(Sender: TCustomRESTRequest);
@@ -58,75 +60,58 @@ begin
   FRESTClient.BaseURL := 'https://api.notion.com/v1';
   FRESTRequest.Client := FRESTClient;
   FRESTRequest.Response := FRESTResponse;
+
   FManager.LogMessage(Format('===== REST Client %s created', [FPublicName]));
 end;
 
 destructor TNotionRESTClient.Destroy;
 begin
   FManager.LogMessage(Format('===== %s BYE =====', [FPublicName]));
+  FRESTResponse.Free;
+  FRESTRequest.Free;
+  FRESTClient.Free;
 
   inherited;
 end;
 
 function TNotionRESTClient.DOGet(const Resource: string;
   Body: string): TJSONObject;
-var
-  Param: TRESTRequestParameter;
 begin
-  FRESTRequest.Resource := Resource;
-  FRESTRequest.Method := rmGET;
-  FRESTClient.Params.Clear;
-
-  // add header params
-  Param := FRESTClient.Params.AddHeader('Notion-Version', '2022-06-28');
-  Param.Options := [poDoNotEncode];
-
-  Param := FRESTClient.Params.AddHeader('Authorization', 'Bearer ' + FNotionSecret);
-  Param.Options := [poDoNotEncode];
-
-  //add body
-  if (Body <> '') then
-    FRESTClient.Params.AddBody(Body, ctAPPLICATION_JSON);
-
-  FManager.LogMessage('TNotionRESTClient.DOGet: ' + FRESTRequest.Resource);
-
-  FRESTRequest.Execute;
-  if (FRESTResponse.StatusCode <> 200) then
-    Result := nil
-  else begin
-    Result := TJSONObject.ParseJSONValue(FRESTResponse.JSONText) as TJSONObject;
-  end;
+  InitializeRequest(Resource, rmGET, '');
+  FManager.LogMessage('executing TNotionRESTClient.DOGet: ' + FRESTRequest.Resource);
+  Result := ExecuteRequest;
 end;
 
 function TNotionRESTClient.DOPost(const Resource: string;
   Body: string): TJSONObject;
-var
-  Param: TRESTRequestParameter;
+begin
+  InitializeRequest(Resource, rmPOST, Body);
+  FManager.LogMessage('executing TNotionRESTClient.DOPost ' + FRESTRequest.Resource);
+  Result := ExecuteRequest;
+end;
+
+procedure TNotionRESTClient.InitializeRequest(const Resource: string;
+  const Method: TRESTRequestMethod; const Body: string);
 begin
   FRESTRequest.Resource := Resource;
-  FRESTRequest.Method := rmPOST;
-  FRESTClient.Params.Clear;
+  FRESTRequest.Method := Method;
+  FRESTRequest.Params.Clear;
+  FRESTRequest.Params.AddHeader('Notion-Version', '2022-06-28').Options := [poDoNotEncode];
+  FRESTRequest.Params.AddHeader('Authorization', 'Bearer ' + FNotionSecret).Options := [poDoNotEncode];
+  if Body <> '' then
+    FRESTRequest.AddBody(Body, ctAPPLICATION_JSON);
+end;
 
-  // add header params
-  Param := FRESTClient.Params.AddHeader('Notion-Version', '2022-06-28');
-  Param.Options := [poDoNotEncode];
-
-  Param := FRESTClient.Params.AddHeader('Authorization', 'Bearer ' + FNotionSecret);
-  Param.Options := [poDoNotEncode];
-
-  //add body
-  if (Body <> '') then
-    FRESTClient.Params.AddBody(Body, ctAPPLICATION_JSON);
-
-  FManager.LogMessage('TNotionRESTClient.DOPost ' + FRESTRequest.Resource);
-
-  //execute
+function TNotionRESTClient.ExecuteRequest: TJSONObject;
+begin
   FRESTRequest.Execute;
-  if (FRESTResponse.StatusCode <> 200) then
-    Result := nil
-  else begin
+  if FRESTResponse.StatusCode <> 200 then
+  begin
+    FManager.LogMessage('HTTP Error: ' + FRESTResponse.StatusText);
+    Result := nil;
+  end
+  else
     Result := TJSONObject.ParseJSONValue(FRESTResponse.JSONText) as TJSONObject;
-  end;
 end;
 
 procedure TNotionRESTClient.OnAfterExecuteHook(Sender: TCustomRESTRequest);

@@ -39,6 +39,7 @@ type
   TPARANotes = class(TNotionDataSet)
     public
       constructor Create(aNotionManager: INotionManager; dsType: TNotionDataSetType); overload;
+      procedure UpdateReferences; override;
   end;
 
   TPARATasks = class(TNotionDataSet)
@@ -131,6 +132,7 @@ constructor TPARAProjects.Create(aNotionManager: INotionManager; dsType: TNotion
 begin
   inherited Create(aNotionmanager, dsType);
 
+  QuerySize := 12;
   DBId := NOTION_DB_PROJECTS;
 end;
 
@@ -141,11 +143,19 @@ constructor TPARANotes.Create(aNotionManager: INotionManager; dsType: TNotionDat
 begin
   inherited Create(aNotionmanager, dsType);
 
+  // will receive notifications for update
+  FIsObserver := true;
+
   // fetch all notes
-  QuerySize := -1;
+  QuerySize := 120;
   DbId :=  NOTION_DB_NOTES;
 end;
 
+
+procedure TPARANotes.UpdateReferences;
+begin
+  inherited;
+end;
 
 { TPARATask }
 
@@ -161,6 +171,10 @@ constructor TPARATasks.Create(aNotionManager: INotionManager; dsType: TNotionDat
 begin
   inherited Create(aNotionmanager, dsType);
 
+  // will receive notifications for update
+  FIsObserver := true;
+
+  QuerySize := 12;
   DbId := NOTION_DB_TASKS;
 end;
 
@@ -178,6 +192,9 @@ end;
 constructor TPARAresources.Create(aNotionManager: INotionManager; dsType: TNotionDataSetType);
 begin
   inherited Create(aNotionmanager, dsType);
+
+  // will receive notifications for update
+  FIsObserver := true;
 
   DbId := NOTION_DB_RESOURCES;
 end;

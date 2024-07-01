@@ -31,7 +31,7 @@ type
     procedure SetQuerySize(querySize: Integer);
     function GetDBID: String;
     procedure SetDBID(id: String);
-
+    function GetIsObserver: Boolean;
     function LoadPages(pagesJSON: TJSONObject): boolean;
     function FetchPages: boolean;
     procedure Initialize;
@@ -39,10 +39,14 @@ type
     function ToJSON: TJSONObject;
     function ToString: string;
 
+    // Observer notification
+    procedure UpdateReferences;
+
     property Name: String read GetName;
     property Pages: TObjectDictionary<String, INotionPage> read GetPages;
     property QuerySize: Integer read GetQuerySize write SetQuerySize;
     property DbID: String read GetDBID write SetDBID;
+    property IsObserver: Boolean read GetIsObserver;
   end;
 
   INotionRESTClient = interface
@@ -65,6 +69,11 @@ type
     function GetDataSets: TObjectDictionary<String, INotionPagesCollection>;
     function GetPagesIndex: TObjectDictionary<String, INotionPage>;
     function CreateNotionPage(pageType: TNotionDataSetType; obj: TJSONObject) : INotionPage;
+
+    // Observer related
+    procedure AttachObserver(Observer: INotionPagesCollection);
+    procedure DetachObserver(Observer: INotionPagesCollection);
+    procedure NotifyObservers;
 
     property Client: INotionRESTClient read GetNotionClient;
     property IsThreaded: Boolean read GetIsThreaded;

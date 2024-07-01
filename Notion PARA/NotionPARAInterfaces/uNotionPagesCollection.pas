@@ -19,6 +19,9 @@ type
     // -1: will get all available pages, in a succession of calls.
     FQuerySize: Integer;
     FDsType: TNotionDataSetType;
+  protected
+    FIsObserver: boolean;
+    procedure LogMessage(msg: String);
   public
     constructor Create; overload;
 
@@ -28,13 +31,16 @@ type
     procedure SetQuerySize(querySize: Integer);
     function GetDBID: String; virtual;
     procedure SetDBID(id: String); virtual;
+    function GetIsObserver: Boolean;
 
-    procedure Initialize; virtual; abstract;
+    procedure Initialize; virtual;
     function LoadPages(pagesJSON: TJSONObject): boolean; virtual;
     function FetchPages: boolean; virtual;
     function PageById(id: string): INotionPage;
     function ToJSON: TJSONObject;
     function ToString: string; override;
+
+    procedure UpdateReferences; virtual;
 
     property Name: String read GetName;
     property Pages: TObjectDictionary<String, INotionPage> read GetPages;
@@ -44,6 +50,10 @@ type
 
 
   TNotionDataSet = class(TNotionPagesCollection)
+  protected
+    function BuildRequestBody(const nextCursor: string): string;
+    function ExtractNextCursor(response: TJSONObject): string;
+    function HandleResponse(response: TJSONObject): Boolean;
   public
     constructor Create(aNotionManager: INotionManager; dsType: TNotionDataSetType); overload;
     procedure Initialize; override;
@@ -68,11 +78,19 @@ begin
 
   //generic
   FDsType := dstGeneric;
+
+  // not notifiable by default
+  FIsObserver := False;
 end;
 
 function TNotionPagesCollection.GetDBID: String;
 begin
   Result := FDbId;
+end;
+
+function TNotionPagesCollection.GetIsObserver: Boolean;
+begin
+  Result := FIsObserver;
 end;
 
 function TNotionPagesCollection.GetName: string;
@@ -88,6 +106,11 @@ end;
 function TNotionPagesCollection.GetQuerySize: Integer;
 begin
   Result := FQuerySize;
+end;
+
+procedure TNotionPagesCollection.Initialize;
+begin
+  // nothing at this level
 end;
 
 // based on a received JSON, builds the pages in the internal data representation
@@ -115,6 +138,12 @@ begin
     end;
     Result := True;
   end;
+end;
+
+// FManage is private, so the descendants can call LogMessage via this
+procedure TNotionPagesCollection.LogMessage(msg: String);
+begin
+  FManager.LogMessage(msg);
 end;
 
 function TNotionPagesCollection.PageById(id: string): INotionPage;
@@ -171,7 +200,15 @@ begin
   Result := sl.Text;
 end;
 
+procedure TNotionPagesCollection.UpdateReferences;
+begin
+  // will implement at level of subclasses
+  FManager.LogMessage('^^^ UpdateReferences notification received by ' + ClassName);
+end;
+
+
 { TNotionDataSet }
+
 
 constructor TNotionDataSet.Create(aNotionManager: INotionManager; dsType: TNotionDataSetType);
 begin
@@ -224,14 +261,53 @@ begin
 end;
 
 
+function TNotionDataSet.ExtractNextCursor(response: TJSONObject): string;
+begin
+  Result := '';
+  var locHasMore := response.FindValue('has_more');
+  if (locHasMore is TJSONBool) and TJSONBool(locHasMore).AsBoolean then
+  begin
+    var locNextCursor := response.FindValue('next_cursor');
+    if Assigned(locNextCursor) then
+      Result := locNextCursor.Value;
+  end;
+end;
+
+function TNotionDataSet.BuildRequestBody(const nextCursor: string): string;
+var
+  body: string;
+  pageSize: Integer;
+begin
+  body := '';
+  if FQuerySize <> 0 then
+  begin
+    pageSize := FQuerySize;
+    if FQuerySize > 0 then
+      pageSize := FQuerySize - FPages.Count
+    else if FQuerySize < 0 then
+      pageSize := 100;
+
+    body := Format('{"page_size": %d', [pageSize]);
+    if nextCursor <> '' then
+      body := body + Format(', "start_cursor": "%s"', [nextCursor]);
+    body := body + '}';
+  end;
+  Result := body;
+end;
+
+function TNotionDataSet.HandleResponse(response: TJSONObject): Boolean;
+begin
+  Result := False;
+  if Assigned(response) then
+    Result := LoadPages(response);
+end;
+
 function TNotionDataSet.FetchPages: boolean;
 var
-  resource: string;
-  body: string;
-  response: TJSONObject;
   locClient: INotionRESTClient;
-  pageSize : Integer;
-  nextCursor: string;
+  response: TJSONObject;
+  body, nextCursor: string;
+  logString : String;
 begin
   nextCursor := '';
 
@@ -242,54 +318,20 @@ begin
     locClient := FManager.Client;
 
   repeat
-    Result := false;
-    body := '';
+    body := BuildRequestBody(nextCursor);
 
-    if (FQuerySize <> 0) then
-    begin
-      // calculate the page size
-      pageSize := 0;
+    logString := 'Fetching for %s%s';
+    if (body <> '') then
+      logString := 'Fetching for %s, call body: %s';
+    FManager.LogMessage(Format(logString, [FName, body]));
 
-      // if a number was specified, try to get that.
-      // if specified is > 100, Notion will limit the response to 100, so we'll loop again
-      if (FQuerySize > 0) then
-        pageSize := FQuerySize - FPages.Count;
 
-      if FQuerySize < 0 then
-        pageSize := 100; // get max allowed by Notion, loop again
+    response := locClient.DOPost(Format('databases/%s/query', [DbId]), body);
+    Result := HandleResponse(response);
 
-      // build a body for the call
-      body := Format('{"page_size": %d', [pageSize]);
-      // if we want more than we have and we have a next cursor, add that in call
-      if (nextCursor <> '') then
-        body := body + Format(', "start_cursor": "%s"', [nextCursor]);
-      body := body + '}';
-
-      FManager.LogMessage(Format('fetching for %s, call body: %s', [FName, body]));
-    end;
-
-    resource := Format('databases/%s/query', [DbId]);
-
-    // make the call
-    response := locClient.DOPost(resource, body);
-
-    if (response <> nil) then begin
-      // load in memory returned pages
-      Result := LoadPages(response);
-
-      // do we have another set?
-      nextCursor := '';
-      var locHasMore: TJSONValue := response.FindValue('has_more');
-      if (locHasMore is TJSONBool) then
-      begin
-         if TJSONBool(locHasMore).AsBoolean then
-         begin
-           var locNextCursor: TJSONValue := response.FindValue('next_cursor');
-           if (locNextCursor <> nil) then
-             nextCursor := locNextCursor.Value;
-         end;
-      end;
-    end;
+    nextCursor := ExtractNextCursor(response);
+    if (nextCursor <> '') then
+      FManager.LogMessage(Format('%s has more unfetched pages.', [FName]));
 
   until (Result = False) or  // something went wrong
         (FQuerySize = 0) or  // terminate if whatever number works
@@ -298,5 +340,7 @@ begin
 
   FManager.LogMessage(Format('fetching for %s ended with %d pages.', [FName, FPages.Count]));
 end;
+
+
 
 end.

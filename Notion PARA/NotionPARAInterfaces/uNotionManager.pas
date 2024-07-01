@@ -27,13 +27,15 @@ type
     FLogFile: string;
     FLogger: TLogger;
 
+    FObservers: TList<INotionPagesCollection>;
+
     procedure InitializeDataSets;
     procedure InitializeDataSetsThreaded;
     procedure AddToIndex(ds: INotionPagesCollection);
     function LoadDataSetsThreaded: Integer;
     function LoadDataSetsNotThreaded: Integer;
   protected
-    procedure ConnectDataSets; virtual;
+    procedure AttachDataSet(ds: INotionPagesCollection);
   public
     constructor Create(publicName, secretKey: String; dsFactory: IPARADataSetFactory ;const IsThreaded: Boolean=False);
     destructor Destroy; override;
@@ -46,6 +48,11 @@ type
     function GetDataSets: TObjectDictionary<String, INotionPagesCollection>;
     function GetPagesIndex: TObjectDictionary<String, INotionPage>;
     function CreateNotionPage(pageType: TNotionDataSetType; obj: TJSONObject) : INotionPage;
+
+    // observer pattern to notify when refresh needed
+    procedure AttachObserver(Observer: INotionPagesCollection);
+    procedure DetachObserver(Observer: INotionPagesCollection);
+    procedure NotifyObservers;
 
     property Client: INotionRESTClient read GetNotionClient;
     property IsThreaded: Boolean read GetIsThreaded;
@@ -83,6 +90,9 @@ begin
   // TO DO
   FDataSets := TObjectDictionary<String, INotionPagesCollection>.Create([]);
 
+  // create the list of observers
+  FObservers := TList<INotionPagesCollection>.Create;
+
   // load info about the datasets
   InitializeDataSets;
 end;
@@ -93,9 +103,11 @@ begin
   FIdxPages.Free;
   // not needed, as it inherits from TInterfacedObject
   //FClient.FreeInstance;
+  FObservers.Free;
 
   inherited;
 end;
+
 
 // creates the appropriate notion page by calling the factory
 function TNotionManager.CreateNotionPage(pageType: TNotionDataSetType;
@@ -116,6 +128,27 @@ begin
   end;
 end;
 
+
+
+procedure TNotionManager.AttachObserver(Observer: INotionPagesCollection);
+begin
+  FObservers.Add(Observer);
+end;
+
+procedure TNotionManager.DetachObserver(Observer: INotionPagesCollection);
+begin
+  FObservers.Remove(Observer);
+end;
+
+procedure TNotionManager.NotifyObservers;
+begin
+  for var Observer in FObservers do
+  begin
+    Observer.UpdateReferences;
+  end;
+end;
+
+(*
 procedure TNotionManager.ConnectDataSets;
 var
   locPage: INotionPage;
@@ -133,6 +166,7 @@ begin
   end;
   LogMessage('Connecting pages done');
 end;
+*)
 
 function TNotionManager.GetDataSets: TObjectDictionary<String, INotionPagesCollection>;
 begin
@@ -154,6 +188,16 @@ begin
   Result := FIdxPages;
 end;
 
+
+procedure TNotionManager.AttachDataSet(ds: INotionPagesCollection);
+begin
+  FDataSets.Add(ds.DbID, ds);
+
+  // is this an observer?
+  if ds.IsObserver then
+    AttachObserver(ds);
+end;
+
 // known datasets are initialized and added in the list of datasets
 // no pages are fetched at this level, just info about the dataset
 // it can run threaded or not, depeding on the mode Manager is in
@@ -163,7 +207,7 @@ var
 begin
   if IsThreaded then begin
     InitializeDataSetsThreaded;
-    Exit;
+    exit;
   end;
 
   // non threaded
@@ -172,7 +216,7 @@ begin
     dsLoc := FDSFactory.CreateDataSet(dsType, self);
 
     if Assigned(dsLoc) then
-      FDataSets.Add(dsLoc.DbID, dsLoc);
+      AttachDataSet(dsLoc);
   end;
 end;
 
@@ -198,7 +242,7 @@ begin
 
       if Assigned(dsLoc) then
       begin
-        FDataSets.Add(dsLoc.DbID, dsLoc);
+        AttachDataSet(dsLoc);
         evLoc := TEvent.Create(nil, True, False, dsName);
         CompleteEvents.Add(evLoc);
 
@@ -249,9 +293,11 @@ begin
     end;
   end;
 
-  //connect references
-  ConnectDataSets;
+  //notify observers to connect references
+  NotifyObservers;
+  //ConnectDataSets;
 end;
+
 
 function TNotionManager.LoadDataSetsThreaded: Integer;
 var
@@ -291,7 +337,8 @@ begin
     end;
 
     //connect references
-    ConnectDataSets;
+    // ConnectDataSets;
+    NotifyObservers;
     Result := CompleteEvents.Count;
   finally
       CompleteEvents.Free;
@@ -302,6 +349,8 @@ procedure TNotionManager.LogMessage(const Msg: string);
 begin
    FLogger.LogMessage(Msg);
 end;
+
+
 
 function TNotionManager.Search(strSearch: String; const pageSize: Integer): INotionPagesCollection;
 var

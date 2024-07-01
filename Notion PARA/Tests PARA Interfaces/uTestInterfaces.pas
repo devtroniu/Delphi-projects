@@ -7,7 +7,6 @@ uses
   uNotionInterfaces, uNotionPagesCollection;
 
 
-
 type
   [TestFixture]
   TTestPARAInterfaces = class
