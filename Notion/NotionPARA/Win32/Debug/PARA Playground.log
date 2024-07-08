@@ -1,0 +1,30 @@
+28 20:38:34:635 - ===== Initiated with secret_BwQ...
+28 20:38:34:650 - starting initialization thread for dstAreasResources
+28 20:38:34:650 - starting initialization thread for dstProjects
+28 20:38:34:650 - starting initialization thread for dstTasks
+28 20:38:34:650 - starting initialization thread for dstNotes
+28 20:38:34:650 -  !!! failed to create dataset dstSomethingNew
+28 20:38:35:892 - All initialization threads have completed.
+28 20:38:35:892 - starting thread for Areas/Resources [PT]
+28 20:38:35:892 - starting thread for Notes [PT]
+28 20:38:35:892 - starting thread for Projects [PT]
+28 20:38:35:892 - starting thread for Tasks [PT]
+28 20:38:37:298 - All threads have completed.
+28 20:38:37:298 - Connecting pages
+28 20:38:37:298 - Connecting done
+28 20:38:38:691 - ===== BYE =====
+29 03:35:15:719 - ===== Initiated with secret_BwQ...
+29 03:35:15:735 - starting initialization thread for dstAreasResources
+29 03:35:15:735 - starting initialization thread for dstProjects
+29 03:35:15:735 - starting initialization thread for dstTasks
+29 03:35:15:735 - starting initialization thread for dstNotes
+29 03:35:15:735 -  !!! failed to create dataset dstSomethingNew
+29 03:35:17:563 - All initialization threads have completed.
+29 03:35:17:579 - starting thread for Areas/Resources [PT]
+29 03:35:17:579 - starting thread for Notes [PT]
+29 03:35:17:579 - starting thread for Projects [PT]
+29 03:35:17:579 - starting thread for Tasks [PT]
+29 03:35:20:235 - All threads have completed.
+29 03:35:20:235 - Connecting pages
+29 03:35:20:250 - Connecting done
+29 03:35:21:413 - ===== BYE =====
