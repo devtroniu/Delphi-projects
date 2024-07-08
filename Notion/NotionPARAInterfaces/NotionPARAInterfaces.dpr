@@ -40,6 +40,7 @@ begin
     WriteLn('==== threaded done. ====');
     WriteLn('total time: ' + FormatDateTime('ss:zzz', dtStart - Now));
 
+    WriteLn;
     Writeln('=== Searching for light');
     dtStart := Now;
     var pages: TNotionPagesCollection := drive.Search('light', 10) as TNotionPagesCollection;

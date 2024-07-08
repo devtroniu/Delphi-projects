@@ -1,5 +1,7 @@
 unit uPARATypes;
 
+// implements classes to handle PARA in Notion: pages, datasets, manager and factory
+
 interface
 
 uses
