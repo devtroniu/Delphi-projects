@@ -144,10 +144,9 @@ end;
 
 constructor TPARAProjects.Create(aNotionManager: INotionManager; db_id: String);
 begin
-  inherited Create(aNotionmanager);
+  inherited Create(aNotionmanager, db_id);
 
   QuerySize := 12;
-  DBId := db_id;
 end;
 
 
@@ -155,13 +154,11 @@ end;
 
 constructor TPARANotes.Create(aNotionManager: INotionManager;  db_id: String);
 begin
-  inherited Create(aNotionmanager);
+  inherited Create(aNotionmanager, db_id);
 
   // will receive notifications for update
   FIsObserver := true;
-
   QuerySize := 12;
-  DbId :=  db_id;
 end;
 
 
@@ -182,12 +179,11 @@ end;
 
 constructor TPARATasks.Create(aNotionManager: INotionManager;  db_id: String);
 begin
-  inherited Create(aNotionmanager);
+  inherited Create(aNotionmanager, db_id);
 
   // will receive notifications for update
   FIsObserver := true;
   QuerySize := -1;
-  DbId := db_id;
 end;
 
 
@@ -203,12 +199,11 @@ end;
 
 constructor TPARAresources.Create(aNotionManager: INotionManager;  db_id: String);
 begin
-  inherited Create(aNotionmanager);
+  inherited Create(aNotionmanager, db_id);
 
   // will receive notifications for update
   FIsObserver := true;
   QuerySize := -1;
-  DbId := db_id;
 end;
 
 

@@ -7,7 +7,7 @@ uses Notion.Manager, Notion.Interfaces, System.JSON;
 type
   TRuckusBlogsFactory = class (TNotionDataSetFactory)
     function CreatePage(dsType: String; obj: TJSONObject): INotionPage; override;
-    function CreateDataSet(dsType: String): INotionPagesCollection; override;
+    function CreateDataSet(dsType, dsId: String): INotionPagesCollection; override;
   end;
 
 
@@ -30,58 +30,67 @@ uses
 
 { TBlogsFactory }
 
-function TRuckusBlogsFactory.CreateDataSet(dsType: String): INotionPagesCollection;
+function TRuckusBlogsFactory.CreateDataSet(dsType, dsId: String): INotionPagesCollection;
 begin
   Result := nil;
 
-  (*
-  if (dsType = RUCKUS_DATASET_TDK_POSTS) then
-    Result := TBlogPagesTDK.Create(FManager);
+  if dsType = DB_TDK then
+    Result := TBlogPagesTDK.Create(FManager, dsId);
 
-
-  if (dsType = RUCKUS_DATASET_PTRNBLG_TEXTS) then
-    Result := TBlogPagesPTRN.Create(FManager);
-  *)
+  if dsType = DB_PTRN then
+    Result := TBlogPagesPTRN.Create(FManager, dsId);
 end;
 
 function TRuckusBlogsFactory.CreatePage(dsType: String; obj: TJSONObject): INotionPage;
 begin
-  Result := nil;
+  result := nil;
 
-  (*
-  if (dsType = RUCKUS_DATASET_TDK_POSTS) then
+  var locType := UpperCase(dsType);
+
+  // they are the same, at this point
+  if (locType = DB_TDK) or (locType = DB_PTRN) then
     Result := TBlogPage.Create(obj);
-
-
-  if (dsType = RUCKUS_DATASET_PTRNBLG_TEXTS) then
-    Result := TBlogPage.Create(obj);
-   *)
 end;
 
-{ TBlogsManager }
 
+
+{ TBlogsManager }
 
 procedure TRuckusBlogsManager.DoWhatYouHaveToDo;
 var
   blogPage: TBlogPage;
+  dbDest: string;
 begin
+  dbDest := GetConfigValue(DB_IMPORTING);
+
+  if dbDest = '' then
+    Exit;
+
   // consolidate pages at destination
   for var pageKey in PagesIndex.Keys do
   begin
     blogPage := PagesIndex[pageKey] as TBlogPage;
     LogMessage(Format('writing %s', [blogPage.Name]));
-    //SavePageInDatabase(RUCKUS_DATASET_IMPORTING, blogPage);
+
+    SavePageInDatabase(dbDest, blogPage);
   end;
 end;
 
 procedure TRuckusBlogsManager.Initialize;
+var
+  dbID: string;
 begin
-  // add known datasets
-  //FKnownDataSets.Add(RUCKUS_DATASET_TDK_POSTS);
-  //FKnownDataSets.Add(RUCKUS_DATASET_PTRNBLG_TEXTS);
-
   // create the factory
   FDSFactory := TRuckusBlogsFactory.Create(self);
+
+  // add known datasets
+  dbID := GetConfigValue(DB_TDK);
+  if dbID <> '' then
+    FKnownDataSets.Add(DB_TDK, dbID);
+
+  dbID := GetConfigValue(DB_PTRN);
+  if dbID <> '' then
+    FKnownDataSets.Add(DB_PTRN, dbID);
 end;
 
 

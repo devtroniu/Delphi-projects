@@ -2,6 +2,8 @@
 
  NotionPARA
 
+ First take at the implementation.
+
  implements a connection to Notion.so, gets data from 4 datasets
  via REST calls and stores them in TObjectDictionary objects in memory,
  resolving the relations between them.

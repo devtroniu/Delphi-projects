@@ -228,7 +228,9 @@ begin
 
   FManager := aNotionManager;
 
-  // the db_id will be processed in descendants
+  // triggers initialisation via SetDBId
+  if db_id <> '' then
+    DbID := db_id;
 end;
 
 procedure TNotionDataSet.Initialize;

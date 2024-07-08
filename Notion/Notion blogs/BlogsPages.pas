@@ -21,14 +21,19 @@ type
 
   TBlogPagesTDK = class(TNotionDataSet)
     public
-      constructor Create(aNotionManager: INotionManager); overload;
+      constructor Create(aNotionManager: INotionManager; db_id: String); overload;
   end;
 
   TBlogPagesPTRN = class(TNotionDataSet)
     public
-      constructor Create(aNotionManager: INotionManager); overload;
+      constructor Create(aNotionManager: INotionManager; db_id: String); overload;
   end;
 
+
+const
+   DB_TDK = 'TDK_POSTS';
+   DB_PTRN = 'PTRNBLG_TEXTS';
+   DB_IMPORTING = 'IMPORTING';
 
 implementation
 uses
@@ -36,28 +41,23 @@ uses
 
 { TBlogPagesTDK }
 
-constructor TBlogPagesTDK.Create(aNotionManager: INotionManager);
+constructor TBlogPagesTDK.Create(aNotionManager: INotionManager; db_id: String);
 begin
-  inherited Create(aNotionmanager);
+  inherited Create(aNotionmanager, db_id);
 
-  QuerySize := -1;
-  // DBId := UPAYAROBLOG_DATASET_TDK_POSTS;
-  //DBId := RUCKUS_DATASET_TDK_POSTS;
+  QuerySize := 33;
 end;
 
 { TBlogPagesPTRN }
 
-constructor TBlogPagesPTRN.Create(aNotionManager: INotionManager);
+constructor TBlogPagesPTRN.Create(aNotionManager: INotionManager; db_id: String);
 begin
-  inherited Create(aNotionmanager);
+  inherited Create(aNotionmanager, db_id);
 
-  QuerySize := -1;
-  // DBId := UPAYAROBLOG_DATASET_PTRNBLG_TEXTS;
-   //DBId := RUCKUS_DATASET_PTRNBLG_TEXTS;
+  QuerySize := 15;
 end;
 
 { TBlogPage }
-
 
 constructor TBlogPage.Create(const aJSON: TJSONObject);
 begin

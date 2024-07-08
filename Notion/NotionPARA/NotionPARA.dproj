@@ -129,7 +129,6 @@
         <DCCReference Include="uPARATypes.pas"/>
         <DCCReference Include="uNotionTypes.pas"/>
         <DCCReference Include="uThreadedGet.pas"/>
-        <DCCReference Include="uGlobalConstants.pas"/>
         <None Include="Win32\Debug\PARA Playground.log"/>
         <None Include="README.md"/>
         <BuildConfiguration Include="Base">

@@ -25,44 +25,27 @@ begin
   dtStart := Now;
 
   try
-
-    // workspace PTRNBLG
-    WriteLn('==================================================================== starting...');
-    drive := TBlogsManager.Create('NotionBlogs', UPAYAROBLOG_CONNECTION, True);
-    drive.LoadDataSets;
-    WriteLn(Format('a total of %d pages loaded:', [drive.PagesIndex.Count]));
-    for var pageKey in drive.PagesIndex.Keys do
-    begin
-      WriteLn(drive.PagesIndex[pageKey].ToString);
-    end;
-    drive.DoWhatYouHaveToDo;
-    //
-
     // workspace Ruckus
-    (*
-    WriteLn('==================================================================== starting...');
-    drive := TRuckusBlogsManager.Create('NotionBlogs Ruckus', True);
+    WriteLn(' ========================================================= starting...');
+    drive := TRuckusBlogsManager.Create('Ruckus', True);
     drive.LoadDataSets;
     WriteLn(Format('a total of %d pages loaded:', [drive.PagesIndex.Count]));
     for var pageKey in drive.PagesIndex.Keys do
     begin
       WriteLn(drive.PagesIndex[pageKey].ToString);
     end;
-    drive.DoWhatYouHaveToDo;
-    *)
+    drive.DoWhatYouHaveToDo;   // copy the page at destination
 
 
-    (*
+    WriteLn;
     var strSearch := 'mirror';
-    Write(Format('search for "%s"...', [strSearch]));
+    WriteLn(Format(' === search for "%s"...', [strSearch]));
     var res := drive.Search(strSearch, 25);
     WriteLn(Format('a total of %d pages loaded:', [res.Pages.Count]));
     for var pageKey in res.Pages.Keys do
     begin
       WriteLn(res.Pages[pageKey].ToString);
     end;
-    *)
-
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);

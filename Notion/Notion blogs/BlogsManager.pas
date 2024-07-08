@@ -7,7 +7,7 @@ uses Notion.Manager, Notion.Interfaces, System.JSON;
 type
   TBlogsFactory = class (TNotionDataSetFactory)
     function CreatePage(dsType: String; obj: TJSONObject): INotionPage; override;
-    function CreateDataSet(dsType: String): INotionPagesCollection; override;
+    function CreateDataSet(dsType, dsId: String): INotionPagesCollection; override;
   end;
 
 
@@ -30,18 +30,15 @@ uses
 
 { TBlogsFactory }
 
-function TBlogsFactory.CreateDataSet(dsType: String): INotionPagesCollection;
+function TBlogsFactory.CreateDataSet(dsType, dsId: String): INotionPagesCollection;
 begin
   Result := nil;
 
-  (*
-  if (dsType = UPAYAROBLOG_DATASET_TDK_POSTS) then
-    Result := TBlogPagesTDK.Create(FManager);
+  if dsType = DB_TDK then
+    Result := TBlogPagesTDK.Create(FManager, dsId);
 
-
-  if (dsType = UPAYAROBLOG_DATASET_PTRNBLG_TEXTS) then
-    Result := TBlogPagesPTRN.Create(FManager);
-  *)
+  if dsType = DB_PTRN then
+    Result := TBlogPagesPTRN.Create(FManager, dsId);
 end;
 
 function TBlogsFactory.CreatePage(dsType: String; obj: TJSONObject): INotionPage;
